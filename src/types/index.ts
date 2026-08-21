@@ -46,3 +46,27 @@ export interface MonthlyHistoryGroup {
   net: number;
   transactions: Transaction[];
 }
+
+export interface SavingsGoal {
+  id: string;
+  title: string;
+  targetAmount: number;
+  createdAt: string; // ISO 8601
+  achievedAt: string | null; // ISO 8601, 達成前はnull
+}
+
+export type AchievementId =
+  | "first-save"
+  | "save-x10"
+  | "save-x50"
+  | "save-x100"
+  | "total-1000"
+  | "total-10000"
+  | "total-50000"
+  | "character-stage4"
+  | "goal-achieved";
+
+export interface UnlockedAchievement {
+  id: AchievementId;
+  unlockedAt: string; // ISO 8601
+}

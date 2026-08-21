@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { MonthlyHistoryGroup, Transaction } from "@/types";
+import { AchievementId, MonthlyHistoryGroup, SavingsGoal, Transaction } from "@/types";
 import {
   deleteAllTransactions,
   getLastSaveAt,
@@ -9,38 +9,52 @@ import {
 } from "@/db/transactionsRepo";
 import { groupTransactionsByMonth } from "@/domain/monthly";
 import { useCharacterStore } from "@/state/useCharacterStore";
+import { useGoalStore } from "@/state/useGoalStore";
+import { useAchievementsStore } from "@/state/useAchievementsStore";
+import { syncWidgets } from "@/domain/widgetSync";
 
 interface TransactionsStoreState {
   transactions: Transaction[];
   monthlyGroups: MonthlyHistoryGroup[];
   netTotal: number;
+  saveCount: number;
   lastSaveAt: string | null;
   isLoaded: boolean;
   load: () => Promise<void>;
-  save: (input: { amount: number; storeId: string | null; storeName: string | null }) => Promise<void>;
+  save: (input: {
+    amount: number;
+    storeId: string | null;
+    storeName: string | null;
+  }) => Promise<{ achievedGoal: SavingsGoal | null; newBadges: AchievementId[] }>;
   spend: (input: { amount: number; storeId: string | null; storeName: string | null; note?: string }) => Promise<void>;
   deleteAll: () => Promise<void>;
 }
 
-async function refresh(set: (partial: Partial<TransactionsStoreState>) => void) {
+async function refresh(
+  set: (partial: Partial<TransactionsStoreState>) => void
+): Promise<{ netTotal: number; saveCount: number }> {
   const [transactions, netTotal, lastSaveAt] = await Promise.all([
     listAllTransactions(),
     getNetTotal(),
     getLastSaveAt(),
   ]);
+  const saveCount = transactions.filter((t) => t.type === "save").length;
   set({
     transactions,
     monthlyGroups: groupTransactionsByMonth(transactions),
     netTotal,
+    saveCount,
     lastSaveAt,
     isLoaded: true,
   });
+  return { netTotal, saveCount };
 }
 
 export const useTransactionsStore = create<TransactionsStoreState>((set) => ({
   transactions: [],
   monthlyGroups: [],
   netTotal: 0,
+  saveCount: 0,
   lastSaveAt: null,
   isLoaded: false,
   load: async () => {
@@ -55,7 +69,17 @@ export const useTransactionsStore = create<TransactionsStoreState>((set) => ({
       occurredAt: new Date().toISOString(),
     });
     await useCharacterStore.getState().registerSave(amount);
-    await refresh(set);
+    const { netTotal, saveCount } = await refresh(set);
+
+    const achievedGoal = await useGoalStore.getState().checkAchievement(netTotal);
+    const newBadges = await useAchievementsStore.getState().evaluate({
+      saveCount,
+      netTotal,
+      characterStage: useCharacterStore.getState().character?.stage ?? null,
+      goalAchieved: achievedGoal !== null,
+    });
+    syncWidgets();
+    return { achievedGoal, newBadges };
   },
   spend: async ({ amount, storeId, storeName, note }) => {
     await insertTransaction({
@@ -68,6 +92,7 @@ export const useTransactionsStore = create<TransactionsStoreState>((set) => ({
     });
     await useCharacterStore.getState().registerSpend(amount);
     await refresh(set);
+    syncWidgets();
   },
   deleteAll: async () => {
     await deleteAllTransactions();

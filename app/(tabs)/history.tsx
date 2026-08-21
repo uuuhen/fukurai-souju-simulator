@@ -1,13 +1,25 @@
+import { useMemo } from "react";
 import { FlatList, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useSettingsStore } from "@/state/useSettingsStore";
 import { useTransactionsStore } from "@/state/useTransactionsStore";
+import { useAchievementsStore } from "@/state/useAchievementsStore";
 import { MonthlyHistoryCard } from "@/components/MonthlyHistoryCard";
+import { ReportSection } from "@/components/ReportSection";
+import { AchievementGrid } from "@/components/AchievementGrid";
+import { buildStoreReport, buildWeekdayReport, currentMonthTransactions } from "@/domain/report";
 
 export default function HistoryScreen() {
   const themeColor = useSettingsStore((s) => s.settings.themeColor);
   const monthlyGroups = useTransactionsStore((s) => s.monthlyGroups);
+  const transactions = useTransactionsStore((s) => s.transactions);
   const netTotal = useTransactionsStore((s) => s.netTotal);
+  const unlockedIds = useAchievementsStore((s) => s.unlockedIds);
+
+  const { weekdayStats, storeStats } = useMemo(() => {
+    const thisMonth = currentMonthTransactions(transactions);
+    return { weekdayStats: buildWeekdayReport(thisMonth), storeStats: buildStoreReport(thisMonth) };
+  }, [transactions]);
 
   return (
     <SafeAreaView style={styles.safeArea} edges={["top", "bottom"]}>
@@ -19,6 +31,12 @@ export default function HistoryScreen() {
         data={monthlyGroups}
         keyExtractor={(item) => item.monthKey}
         contentContainerStyle={styles.list}
+        ListHeaderComponent={
+          <View style={{ gap: 12, marginBottom: 4 }}>
+            <ReportSection weekdayStats={weekdayStats} storeStats={storeStats} themeColor={themeColor} />
+            <AchievementGrid unlockedIds={unlockedIds} />
+          </View>
+        }
         renderItem={({ item }) => <MonthlyHistoryCard group={item} themeColor={themeColor} />}
         ListEmptyComponent={
           <Text style={styles.empty}>まだ履歴がありません。{"\n"}コンビニで我慢できたら「貯金する」を押してみよう。</Text>

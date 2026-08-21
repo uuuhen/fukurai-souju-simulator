@@ -7,6 +7,9 @@ import { useSettingsStore } from "@/state/useSettingsStore";
 import { useStoresStore } from "@/state/useStoresStore";
 import { useCharacterStore } from "@/state/useCharacterStore";
 import { useTransactionsStore } from "@/state/useTransactionsStore";
+import { useGoalStore } from "@/state/useGoalStore";
+import { useAchievementsStore } from "@/state/useAchievementsStore";
+import { syncWidgets } from "@/domain/widgetSync";
 
 export default function RootLayout() {
   const [isReady, setIsReady] = useState(false);
@@ -18,7 +21,10 @@ export default function RootLayout() {
         useStoresStore.getState().load(),
         useCharacterStore.getState().load(),
         useTransactionsStore.getState().load(),
+        useGoalStore.getState().load(),
+        useAchievementsStore.getState().load(),
       ]);
+      syncWidgets();
       setIsReady(true);
     })();
   }, []);

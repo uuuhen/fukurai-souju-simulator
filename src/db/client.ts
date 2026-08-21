@@ -45,6 +45,19 @@ async function migrate(db: SQLite.SQLiteDatabase) {
       key TEXT PRIMARY KEY NOT NULL,
       value TEXT NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS savings_goals (
+      id TEXT PRIMARY KEY NOT NULL,
+      title TEXT NOT NULL,
+      target_amount INTEGER NOT NULL,
+      created_at TEXT NOT NULL,
+      achieved_at TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS achievements (
+      id TEXT PRIMARY KEY NOT NULL,
+      unlocked_at TEXT NOT NULL
+    );
   `);
 
   const storeCountRow = await db.getFirstAsync<{ count: number }>(
