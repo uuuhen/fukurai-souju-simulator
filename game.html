@@ -16,7 +16,9 @@
   --soil: #6b4c31;
   --soil-alt: #634529;
   --soil-edge: #3e2a19;
-  --wall: #4a4038;
+  --wall: #4f453c;
+  --wall-line: #3a322b;
+  --wall-hi: #7a6c5e;
   --sun: #ffb22e;
   --moon: #b8dbff;
   --shade: #1a0f26;
@@ -80,33 +82,40 @@ h1 { font-family: var(--font-display); font-size: 21px; margin: 0 auto 0 0; lett
   position: relative;
   width: min(100%, 54vh);
   width: min(100%, 54svh);
-  aspect-ratio: 8.2 / 7.6;
+  aspect-ratio: 8.2 / 7.9;
   margin: 0 auto;
   container-type: inline-size;
 }
 .board {
   position: absolute; inset: 0; display: grid;
   grid-template-columns: .6fr repeat(7, 1fr) .6fr;
-  grid-template-rows: repeat(7, 1fr) .6fr;
+  grid-template-rows: .3fr repeat(7, 1fr) .6fr;
 }
-.edge { display: flex; align-items: center; justify-content: center; gap: 2px; flex-wrap: wrap; background: var(--wall); }
-.edge.v { flex-direction: column; }
-.tick { width: 3px; height: 3px; border-radius: 50%; background: rgba(241, 230, 204, .22); }
-.src {
-  display: grid; place-items: center; border-radius: 50%; line-height: 1; flex: none;
-  width: 20px; height: 20px;
-  width: calc(100cqw * .058); height: calc(100cqw * .058);
-  font-size: calc(100cqw * .036);
+/* 城壁: 上から見た石積み。東・南・西の壁には光窓が並び、北の壁には窓がない */
+.edge { display: grid; place-items: center; background-color: var(--wall); }
+.edge.v { background-image: repeating-linear-gradient(180deg, transparent 0 13px, var(--wall-line) 13px 14px); }
+.edge.h, .edge.north { background-image: repeating-linear-gradient(90deg, transparent 0 13px, var(--wall-line) 13px 14px); }
+.edge.corner { background-color: var(--wall-line); }
+.win {
+  display: flex; align-items: center; justify-content: center; gap: 1px;
+  background: #15110d; box-shadow: inset 0 0 6px rgba(0, 0, 0, .8);
 }
-.src.sun { background: radial-gradient(circle, #ffe08a, var(--sun)); color: #4a2a00; box-shadow: 0 0 10px var(--sun); }
-.src.moon { background: radial-gradient(circle, #f4fbff, var(--moon)); color: #1d2d4a; box-shadow: 0 0 10px var(--moon); }
-.src.moon.dim { background: radial-gradient(circle, #9fb3c8, #5c7088); box-shadow: 0 0 6px rgba(184, 219, 255, .5); }
-.src.strong { box-shadow: 0 0 0 2px #fff, 0 0 16px 4px currentColor; }
-.src.off { background: #3b3f45; color: #9aa0a8; box-shadow: none; }
-.next {
-  flex: none; width: 11px; height: 11px; width: calc(100cqw * .032); height: calc(100cqw * .032);
-  border-radius: 50%; border: 1.5px dashed var(--moon); opacity: .8;
-}
+.edge.v .win { width: 100%; height: 52%; flex-direction: column; border-block: 2px solid var(--wall-hi); }
+.edge.h .win { height: 100%; width: 52%; border-inline: 2px solid var(--wall-hi); }
+.win.off { background: #3b3f45; box-shadow: inset 0 0 6px rgba(0, 0, 0, .6); }
+.win.sun { background: radial-gradient(circle, #fff1c2, var(--sun) 70%); box-shadow: 0 0 12px 2px rgba(255, 178, 46, .7); }
+.win.moon { background: radial-gradient(circle, #f4fbff, #8fb6dd 75%); box-shadow: 0 0 10px 2px rgba(184, 219, 255, .55); }
+.win.moon.dim { background: radial-gradient(circle, #c9d9ea, #5c7088 80%); box-shadow: 0 0 6px rgba(184, 219, 255, .35); }
+.win.moon.strong { box-shadow: 0 0 16px 4px rgba(200, 228, 255, .85); }
+.win.sun.moon { background: linear-gradient(180deg, var(--sun) 50%, var(--moon) 50%); }
+.win.next { outline: 1.5px dashed var(--moon); outline-offset: -1px; }
+.src { display: grid; place-items: center; line-height: 1; flex: none; font-size: 13px; font-size: calc(100cqw * .04); }
+.src.sun { color: #5a3300; }
+.src.moon { color: #1d2d4a; }
+.src.off { color: #9aa0a8; }
+.win.two .src { font-size: calc(100cqw * .03); }
+.shaft { animation: shimmer 3.2s ease-in-out infinite alternate; }
+@keyframes shimmer { from { opacity: .7; } to { opacity: 1; } }
 .cell {
   position: relative; border: 0; padding: 0; margin: 0;
   background: var(--soil); box-shadow: inset 0 0 0 .5px var(--soil-edge);
@@ -119,12 +128,12 @@ button.cell:focus-visible { outline: 2px solid var(--text); outline-offset: -2px
 .placing button.cell:not(.has) { box-shadow: inset 0 0 0 1.5px rgba(255, 210, 122, .55); }
 .frame {
   position: absolute; z-index: 1; pointer-events: none;
-  left: calc(100% * .6 / 8.2); right: calc(100% * .6 / 8.2); top: 0; bottom: calc(100% * .6 / 7.6);
+  left: calc(100% * .6 / 8.2); right: calc(100% * .6 / 8.2); top: calc(100% * .3 / 7.9); bottom: calc(100% * .6 / 7.9);
   border: 2px solid #2a1b0e; border-radius: 3px; box-shadow: 0 8px 20px rgba(0, 0, 0, .35);
 }
 .veil {
   position: absolute; z-index: 2; pointer-events: none; opacity: 0; transition: opacity .5s ease;
-  left: calc(100% * .6 / 8.2); right: calc(100% * .6 / 8.2); top: 0; bottom: calc(100% * .6 / 7.6);
+  left: calc(100% * .6 / 8.2); right: calc(100% * .6 / 8.2); top: calc(100% * .3 / 7.9); bottom: calc(100% * .6 / 7.9);
 }
 .board-wrap[data-phase="morning"] .veil.sunv { background: radial-gradient(circle at 100% 50%, rgba(255, 200, 110, .32), transparent 70%); opacity: 1; }
 .board-wrap[data-phase="noon"] .veil.sunv { background: radial-gradient(circle at 50% 100%, rgba(255, 220, 140, .3), transparent 75%); opacity: 1; }
@@ -404,13 +413,20 @@ body.night .actionbar { background: linear-gradient(180deg, transparent, var(--g
     <div class="frame"></div>
     <div class="veil sunv"></div>
     <div class="veil nightv"></div>
-    <svg class="beams" viewBox="0 0 8.2 7.6" preserveAspectRatio="none" aria-hidden="true">
+    <svg class="beams" viewBox="0 0 8.2 7.9" preserveAspectRatio="none" aria-hidden="true">
       <defs>
-        <filter id="glow" filterUnits="userSpaceOnUse" x="-1" y="-1" width="10.2" height="9.6">
+        <filter id="glow" filterUnits="userSpaceOnUse" x="-1" y="-1" width="10.2" height="9.9">
           <feGaussianBlur stdDeviation=".07" result="b"></feGaussianBlur>
           <feMerge><feMergeNode in="b"></feMergeNode><feMergeNode in="SourceGraphic"></feMergeNode></feMerge>
         </filter>
+        <linearGradient id="shaft-sun-E" x1="1" y1="0" x2="0" y2="0"><stop offset="0" stop-color="#ffd27a" stop-opacity=".55"></stop><stop offset="1" stop-color="#ffd27a" stop-opacity="0"></stop></linearGradient>
+        <linearGradient id="shaft-sun-W" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#ffb46a" stop-opacity=".55"></stop><stop offset="1" stop-color="#ffb46a" stop-opacity="0"></stop></linearGradient>
+        <linearGradient id="shaft-sun-S" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#ffe2a0" stop-opacity=".55"></stop><stop offset="1" stop-color="#ffe2a0" stop-opacity="0"></stop></linearGradient>
+        <linearGradient id="shaft-moon-E" x1="1" y1="0" x2="0" y2="0"><stop offset="0" stop-color="#cfe6ff" stop-opacity=".45"></stop><stop offset="1" stop-color="#cfe6ff" stop-opacity="0"></stop></linearGradient>
+        <linearGradient id="shaft-moon-W" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#cfe6ff" stop-opacity=".45"></stop><stop offset="1" stop-color="#cfe6ff" stop-opacity="0"></stop></linearGradient>
+        <linearGradient id="shaft-moon-S" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#cfe6ff" stop-opacity=".45"></stop><stop offset="1" stop-color="#cfe6ff" stop-opacity="0"></stop></linearGradient>
       </defs>
+      <g id="shafts"></g>
       <g id="beams"></g>
     </svg>
     <div class="floats" id="floats"></div>
@@ -514,8 +530,9 @@ body.night .actionbar { background: linear-gradient(180deg, transparent, var(--g
 <script>
 // ---- ゲームの設定（バランス調整はここ） ----
 const SIZE = 7;                 // 庭は7×7マス
-const EDGE = 0.6;               // 城壁（光窓）の幅（マス単位）
-const W_UNITS = SIZE + EDGE * 2, H_UNITS = SIZE + EDGE;
+const EDGE = 0.6;               // 東・南・西の城壁（光窓）の厚さ（マス単位）
+const TOP = 0.3;                // 北の城壁の厚さ（北から日は差さないので窓はない）
+const W_UNITS = SIZE + EDGE * 2, H_UNITS = TOP + SIZE + EDGE;
 const MAX_DAYS = 10;            // 10日目の夜には必ず現れる
 const START_DEPTH = 70;         // 影の竜の最初の深さ(m)
 const DEPTH_CAP = 80;
@@ -704,11 +721,11 @@ function sources() {
     { id: 'night', light: 'moon', label: m.name, side: m.side, pos: m.pos, mult: m.mult * (S.incense ? 2 : 1) },
   ];
 }
-const center = (r, c) => [EDGE + c + .5, r + .5];
+const center = (r, c) => [EDGE + c + .5, TOP + r + .5];
 function entry(side, pos) {
-  if (side === 'E') return { r: pos, c: SIZE - 1, dr: 0, dc: -1, pt: [EDGE + SIZE + EDGE / 2, pos + .5] };
-  if (side === 'W') return { r: pos, c: 0, dr: 0, dc: 1, pt: [EDGE / 2, pos + .5] };
-  return { r: SIZE - 1, c: pos, dr: -1, dc: 0, pt: [EDGE + pos + .5, SIZE + EDGE / 2] };
+  if (side === 'E') return { r: pos, c: SIZE - 1, dr: 0, dc: -1, pt: [EDGE + SIZE + EDGE / 2, TOP + pos + .5] };
+  if (side === 'W') return { r: pos, c: 0, dr: 0, dc: 1, pt: [EDGE / 2, TOP + pos + .5] };
+  return { r: SIZE - 1, c: pos, dr: -1, dc: 0, pt: [EDGE + pos + .5, TOP + SIZE + EDGE / 2] };
 }
 
 // 光の通り道。竜と卵は光を通し、岩と蔓は止め、裂け目は光を吸って封じられ、プリズムは左右に分ける
@@ -783,11 +800,13 @@ function damageRange(extra = {}) {
 }
 
 let busy = false;
+let shaftPhase = null;  // 光が走っている間は、その光の窓の光の筋だけを出す
 
 // ---- 描画 ----
 function render() {
   const plan = busy ? null : dayPlan();
   renderBoard(plan);
+  renderShafts(busy ? shaftPhase : null);
   renderHud(plan);
   updateTimer();
   if (plan) {
@@ -795,36 +814,46 @@ function render() {
   }
 }
 
-function srcIcon(src) {
-  if (src.light === 'sun') {
-    const off = !src.mult;
-    return `<span class="src sun${off ? ' off' : ''}" role="img" aria-label="${src.label}${off ? '（天気で出ない）' : ''}">${off ? '☁︎' : '☀︎'}</span>`;
-  }
-  const m = moonOf(S.day);
-  return `<span class="src moon${m.dim ? ' dim' : ''}${src.mult > 1 ? ' strong' : ''}" role="img" aria-label="月（${m.name}）">${m.glyph}</span>`;
-}
-
 function renderBoard(plan) {
   const srcs = sources();
+  const moonToday = moonOf(S.day);
   const tomorrow = S.day < MAX_DAYS ? moonOf(S.day + 1) : null;
   const litSun = new Set(), litMoon = new Set();
   if (plan) for (const t of plan.traces) for (const d of t.lit) (t.light === 'sun' ? litSun : litMoon).add(d.id);
   const out = [];
-  const edgeCell = (side, pos, gridPos, vertical) => {
-    const icons = srcs.filter(s => s.side === side && s.pos === pos).map(srcIcon);
-    if (tomorrow && tomorrow.side === side && tomorrow.pos === pos) icons.push('<span class="next" role="img" aria-label="明日の月"></span>');
-    out.push(`<div class="edge${vertical ? ' v' : ''}" style="${gridPos}">${icons.length ? icons.join('') : '<span class="tick"></span>'}</div>`);
+  // 城壁の光窓。光が入る窓だけが明るく、それ以外は暗い開口部
+  const edgeCell = (side, pos, gridPos) => {
+    const here = srcs.filter(s => s.side === side && s.pos === pos);
+    const cls = ['win'], icons = [];
+    for (const s of here) {
+      if (s.light === 'sun') {
+        cls.push(s.mult ? 'sun' : 'off');
+        icons.push(s.mult
+          ? `<span class="src sun" role="img" aria-label="${s.label}が差し込む窓">☀︎</span>`
+          : `<span class="src off" role="img" aria-label="${s.label}の窓（天気で出ない）">☁︎</span>`);
+      } else {
+        cls.push('moon');
+        if (moonToday.dim) cls.push('dim');
+        if (s.mult > 1) cls.push('strong');
+        icons.push(`<span class="src moon" role="img" aria-label="月（${moonToday.name}）が差し込む窓">${moonToday.glyph}</span>`);
+      }
+    }
+    if (here.length > 1) cls.push('two');
+    const next = tomorrow && tomorrow.side === side && tomorrow.pos === pos;
+    if (next) cls.push('next');
+    out.push(`<div class="edge ${side === 'S' ? 'h' : 'v'}" style="${gridPos}"><span class="${cls.join(' ')}"${next && !here.length ? ' role="img" aria-label="明日の月が差し込む窓"' : ''}>${icons.join('')}</span></div>`);
   };
+  out.push(`<div class="edge north" style="grid-row:1;grid-column:2 / span ${SIZE}"></div>`);
+  for (const [row, col] of [[1, 1], [1, SIZE + 2], [SIZE + 2, 1], [SIZE + 2, SIZE + 2]]) out.push(`<div class="edge corner" style="grid-row:${row};grid-column:${col}"></div>`);
   for (let i = 0; i < SIZE; i++) {
-    edgeCell('W', i, `grid-row:${i + 1};grid-column:1`, true);
-    edgeCell('E', i, `grid-row:${i + 1};grid-column:${SIZE + 2}`, true);
-    edgeCell('S', i, `grid-row:${SIZE + 1};grid-column:${i + 2}`, false);
+    edgeCell('W', i, `grid-row:${i + 2};grid-column:1`);
+    edgeCell('E', i, `grid-row:${i + 2};grid-column:${SIZE + 2}`);
+    edgeCell('S', i, `grid-row:${SIZE + 2};grid-column:${i + 2}`);
   }
-  out.push(`<div class="edge" style="grid-row:${SIZE + 1};grid-column:1"></div><div class="edge" style="grid-row:${SIZE + 1};grid-column:${SIZE + 2}"></div>`);
   for (let r = 0; r < SIZE; r++) {
     for (let c = 0; c < SIZE; c++) {
       const k = key(r, c);
-      const pos = `grid-row:${r + 1};grid-column:${c + 2}`;
+      const pos = `grid-row:${r + 2};grid-column:${c + 2}`;
       const alt = (r + c) % 2 ? ' alt' : '';
       const fixed = inner => out.push(`<div class="cell${alt}" style="${pos}">${inner}</div>`);
       if (S.rocks.includes(k)) { fixed('<span class="rock" role="img" aria-label="岩"></span>'); continue; }
@@ -971,6 +1000,24 @@ setInterval(() => {
 }, 200);
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
+// 窓から庭へ広がる光の筋
+function renderShafts(only) {
+  const L = 1.6, h0 = .26, h1 = .48;
+  const shapes = [];
+  for (const s of sources()) {
+    if (!s.mult || (only && s.id !== only)) continue;
+    let pts;
+    if (s.side === 'E') { const x0 = EDGE + SIZE, y = TOP + s.pos + .5; pts = [[x0, y - h0], [x0 - L, y - h1], [x0 - L, y + h1], [x0, y + h0]]; }
+    else if (s.side === 'W') { const x0 = EDGE, y = TOP + s.pos + .5; pts = [[x0, y - h0], [x0 + L, y - h1], [x0 + L, y + h1], [x0, y + h0]]; }
+    else { const y0 = TOP + SIZE, x = EDGE + s.pos + .5; pts = [[x - h0, y0], [x - h1, y0 - L], [x + h1, y0 - L], [x + h0, y0]]; }
+    const p = document.createElementNS(SVG_NS, 'polygon');
+    p.setAttribute('points', pts.map(([x, y]) => `${x},${y}`).join(' '));
+    p.setAttribute('class', 'shaft');
+    p.setAttribute('fill', `url(#shaft-${s.light}-${s.side})`);
+    shapes.push(p);
+  }
+  $('shafts').replaceChildren(...shapes);
+}
 function polyline(pts, cls) {
   const p = document.createElementNS(SVG_NS, 'polyline');
   p.setAttribute('points', pts.map(([x, y]) => `${x},${y}`).join(' '));
@@ -1122,6 +1169,8 @@ async function advance() {
     } else {
       wrap.dataset.phase = t.id;
     }
+    shaftPhase = t.id;
+    renderShafts(t.id);
     if (!t.paths.length) {
       toast(`${t.label}は出ない…`, 1100);
       await wait(700);
@@ -1134,6 +1183,7 @@ async function advance() {
     beamsG.replaceChildren();
   }
   // 夜明け前: 影の竜が上がってくる
+  shaftPhase = 'none';
   S.depth = Math.min(DEPTH_CAP, S.depth + plan.change);
   wrap.classList.remove('quake');
   void wrap.offsetWidth;
