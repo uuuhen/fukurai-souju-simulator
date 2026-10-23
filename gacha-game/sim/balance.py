@@ -19,9 +19,11 @@ CARDS_CSV = Path(__file__).resolve().parent.parent / "data" / "cards_season1.csv
 
 # ---------------------------------------------------------------- くじ
 
-# 1回あたりの排出率(レアリティ別)。★5 を 1000連でほぼ50%になる値に固定している。
-RATES = {5: 0.0007, 4: 0.010, 3: 0.050, 2: 0.240}
-RATES[1] = 1.0 - sum(RATES.values())
+# 連の単位ごとの「★5 が1枚以上出る確率」。単位ごとに固定する。
+# 1回あたりに直すと 10連が一番高く、1000連が一番低い。
+UNIT_SSR = {10: 0.01, 100: 0.08, 1000: 0.50}
+# ★4以下は単位によらず1回あたりの排出率。★1 は残り全部
+LOWER_RATES = {4: 0.010, 3: 0.050, 2: 0.240}
 
 PITY = 3000  # ★5 が出ないまま 3000回引いたら次の1回は★5確定
 
@@ -32,40 +34,53 @@ STAT_RANK_CAP = 10  # 能力が伸びるのはランク10まで。それ以降�
 
 # くじ枠
 FREE_PER_HOUR = 200
-FREE_STOCK_CAP = 1000
-BOOST_STEPS = [400, 300, 200, 100]  # 1時間内の上限突破(100円ごと)
+FREE_STOCK_CAP = 9600  # 48時間分。2日に1回ログインすれば取りこぼさない
+HOURLY_CAP = 1000  # 上限突破しても1時間に得られるのは1000回まで
+BOOST_STEPS = [400, 300, 200]  # 100円ごとの追加。HOURLY_CAP を超える分は切り捨て
 SUBSCRIPTION_PER_DAY = 4000
+
+
+def ssr_rate(unit):
+    """unit 連で引いたときの1回あたりの★5排出率。"""
+    return 1.0 - (1.0 - UNIT_SSR[unit]) ** (1 / unit)
+
+
+def rates(unit):
+    r = {5: ssr_rate(unit), **LOWER_RATES}
+    r[1] = 1.0 - sum(r.values())
+    return r
 
 
 def p_at_least_one(n, p):
     return 1.0 - (1.0 - p) ** n
 
 
-def report_gacha():
-    p5 = RATES[5]
-    print("== くじ: ★5 が1枚以上出る確率 ==")
-    print(f"1回あたり ★5 {p5:.4%} / ★4 {RATES[4]:.2%} / ★3 {RATES[3]:.2%}"
-          f" / ★2 {RATES[2]:.2%} / ★1 {RATES[1]:.2%}")
-    for n in (10, 100, 1000):
-        print(f"  {n:>4}連: {p_at_least_one(n, p5):6.2%}")
-    print(f"  ★5 1枚までの期待回数: {1 / p5:,.0f} 回")
-    print(f"  天井({PITY}回)に到達する確率: {(1 - p5) ** PITY:.1%}")
-
-    print("\n== 参考: 単位ごとに確率を固定した場合 (10連1% / 100連8% / 1000連50%) ==")
-    unit = {10: 0.01, 100: 0.08, 1000: 0.50}
-    for n, p in unit.items():
-        per_draw = 1 - (1 - p) ** (1 / n)
-        print(f"  {n:>4}連 {p:.0%}  -> 1回あたり換算 {per_draw:.4%}")
-    print("  同じ1000回を引いたときに★5が1枚以上出る確率:")
-    for n, p in unit.items():
-        print(f"    {n:>4}連 x {1000 // n:>3}: {p_at_least_one(1000 // n, p):6.2%}")
-
-    print("\n== 上限突破 (1時間内) ==")
-    total, yen = FREE_PER_HOUR, 0
+def boost_ladder():
+    """[(今回の追加, その1時間の合計), ...]。100円ごとに1段。"""
+    total, ladder = FREE_PER_HOUR, []
     for step in BOOST_STEPS:
-        total += step
-        yen += 100
-        print(f"  {yen:>3}円: その1時間の枠 {total:>5}回 (今回 +{step}, {100 / step:.2f}円/回)")
+        added = min(step, HOURLY_CAP - total)
+        if added <= 0:
+            break
+        total += added
+        ladder.append((added, total))
+    return ladder
+
+
+def report_gacha():
+    print("== くじ: 連の単位ごとの★5 ==")
+    print("  単位    ★5が1枚以上  1回あたり  1000回あたりの★5  天井に届く確率")
+    for unit, p in UNIT_SSR.items():
+        print(f"  {unit:>4}連  {p:>10.2%}  {ssr_rate(unit):>9.4%}  {1000 * ssr_rate(unit):>13.2f}枚"
+              f"  {(1 - p) ** (PITY / unit):>13.1%}")
+    print("  ★4 {:.2%} / ★3 {:.2%} / ★2 {:.2%} (単位によらず1回あたり)".format(*LOWER_RATES.values()))
+    print("  同じ1000回を引いたときに★5が1枚以上出る確率:")
+    for unit, p in UNIT_SSR.items():
+        print(f"    {unit:>4}連 x {1000 // unit:>3}: {p_at_least_one(1000 // unit, p):6.2%}")
+
+    print("\n== 上限突破 (1時間ごと) ==")
+    for i, (added, total) in enumerate(boost_ladder(), 1):
+        print(f"  {100 * i:>3}円: その1時間 {total:>5}回 (今回 +{added}, {100 / added:.2f}円/回)")
 
 
 # ------------------------------------------------------------- カード
@@ -91,44 +106,42 @@ def load_cards():
 
 # ------------------------------------------------------------ 育成速度
 
-def daily_free_draws(login_hours):
-    """毎日同じ時刻にログインする人が1日に使える無料くじの回数。"""
-    hours = sorted(login_hours)
-    gaps = [(hours[(i + 1) % len(hours)] - h) % 24 or 24 for i, h in enumerate(hours)]
-    return sum(min(g * FREE_PER_HOUR, FREE_STOCK_CAP) for g in gaps)
-
-
+FREE_PER_DAY = FREE_PER_HOUR * 24
+BOOST_PER_HOUR = sum(added for added, _ in boost_ladder())
 PROFILES = {
-    "ライト(1日3回)": daily_free_draws([7, 12, 21]),
-    "ミドル(起きている間2時間おき)": daily_free_draws(range(7, 24, 2)),
+    "無課金(2日に1回以上ログイン)": FREE_PER_DAY,
+    "サブスク": FREE_PER_DAY + SUBSCRIPTION_PER_DAY,
+    f"重課金(サブスク+上限突破を1日4時間, {4 * 100 * len(boost_ladder())}円/日)":
+        FREE_PER_DAY + SUBSCRIPTION_PER_DAY + 4 * BOOST_PER_HOUR,
 }
-PROFILES["サブスク(ミドル+4000)"] = PROFILES["ミドル(起きている間2時間おき)"] + SUBSCRIPTION_PER_DAY
-PROFILES["重課金(サブスク+上限突破を1日4時間)"] = PROFILES["サブスク(ミドル+4000)"] + 4 * sum(BOOST_STEPS)
 
 
 def report_growth(cards):
-    counts = {r: sum(1 for c in cards.values() if c.rarity == r) for r in RATES}
+    counts = {r: sum(1 for c in cards.values() if c.rarity == r) for r in range(1, 6)}
     print("== 育成: 1日に引ける回数 ==")
     for name, n in PROFILES.items():
-        print(f"  {name:<32} {n:>6,} 回/日")
+        print(f"  {name:<44} {n:>6,} 回/日"
+              + "".join(f"  {unit}連なら{n // unit:>4}回" for unit in UNIT_SSR))
 
     print(f"\n== 特定の1枚をランク+1するまでの日数 (第1期 {len(cards)}種) ==")
-    for label, points in (("1000枚そのまま", {r: 1 for r in RATES}), ("合成値で重み付け(推奨)", SYNTH_POINTS)):
-        print(f"[{label}: " + " ".join(f"★{r}={points[r]}" for r in sorted(points)) + "]")
-        print("  " + " " * 32 + "".join(f"{'★' + str(r):>9}" for r in sorted(RATES)))
-        for name, n in PROFILES.items():
-            row = []
-            for r in sorted(RATES):
-                per_card = RATES[r] / counts[r]
-                row.append(RANK_UP_POINTS / (per_card * n * points[r]))
-            print(f"  {name:<32}" + "".join(f"{d:>9.1f}" for d in row))
-    print("  (ランク10 = ランクアップ9回分。表の日数 x 9 が能力上限までの目安)")
+    print("  [合成値: " + " ".join(f"★{r}={SYNTH_POINTS[r]}" for r in sorted(SYNTH_POINTS)) + "]")
+    print("  " + " " * 44 + "".join(f"{'★' + str(r):>7}" for r in range(1, 5))
+          + "".join(f"{'★5(' + str(u) + '連)':>11}" for u in UNIT_SSR))
 
-    print("\n== 図鑑: 第1期の全52種がそろうまで (ライト) ==")
-    n = PROFILES["ライト(1日3回)"]
-    for days in (1, 2, 3, 7):
-        expected = sum(counts[r] * p_at_least_one(n * days, RATES[r] / counts[r]) for r in RATES)
-        print(f"  {days}日目: 平均 {expected:.1f} 種")
+    def days(rate, rarity, n):
+        return RANK_UP_POINTS / (rate / counts[rarity] * n * SYNTH_POINTS[rarity])
+
+    for name, n in PROFILES.items():
+        lower = [days(rates(1000)[r], r, n) for r in range(1, 5)]
+        top = [days(ssr_rate(u), 5, n) for u in UNIT_SSR]
+        print(f"  {name:<44}" + "".join(f"{d:>7.1f}" for d in lower) + "".join(f"{d:>11.1f}" for d in top))
+    print("  (★1-★4 は単位による差がほぼない。ランク10 = ランクアップ9回分)")
+
+    print("\n== 図鑑: 第1期の全52種がそろうまで (無課金, すべて1000連) ==")
+    n, r = PROFILES["無課金(2日に1回以上ログイン)"], rates(1000)
+    for d in (1, 2, 3, 7):
+        expected = sum(counts[k] * p_at_least_one(n * d, r[k] / counts[k]) for k in r)
+        print(f"  {d}日目: 平均 {expected:.1f} 種")
 
 
 # --------------------------------------------------------------- 対戦
@@ -156,7 +169,7 @@ def rank_mult(rank):
 
 @dataclass
 class Unit:
-    """精霊1体 + 霊獣1体 + 霊具1つ。"""
+    """精霊1体に霊獣1体・霊具1つを付与したもの。"""
     spirit: Card
     beast: Card | None = None
     tool: Card | None = None
@@ -272,7 +285,7 @@ def team_winrate(team_a, team_b, n=3000, seed=2):
 
 def report_battle(cards):
     c = cards
-    gear = {  # 属性ごとの標準装備(各属性で手に入りやすい霊獣・霊具)
+    gear = {  # 属性ごとの標準の付与素材(各属性で手に入りやすい霊獣・霊具)
         "土": (c["石熊"], c["岩槌"]), "火": (c["炎狐"], c["焔扇"]),
         "水": (c["河童"], c["水鏡"]), "雷": (c["鵺"], c["雷太鼓"]),
         "光": (c["白兎"], c["白鏡"]), "闇": (c["夜鴉"], c["呪い釘"]),
@@ -285,7 +298,7 @@ def report_battle(cards):
     def pct(xs):
         return "".join(f"{x:>7.0%}" for x in xs)
 
-    print(f"== 対戦: 属性相性 (有利 x{ADVANTAGE} / 不利 x{DISADVANTAGE}, 標準装備, ランク1) ==")
+    print(f"== 対戦: 属性相性 (有利 x{ADVANTAGE} / 不利 x{DISADVANTAGE}, 標準の付与, ランク1) ==")
     print("  同じ★どうしの勝率。行が自分、列が相手")
     for k in (1, 4):
         print(f"  ★{k}       " + "".join(f"{'vs' + a:>6}" for a in "土火水雷"))
@@ -313,10 +326,10 @@ def report_battle(cards):
               + " / ".join(f"{winrate(std(five, 5), std(a, 4)):.0%}" for a in "土火水雷"))
     print(f"  光輪天女 vs 黄泉津姫: {winrate(std('光', 5), std('闇', 5)):.0%}")
 
-    print("\n== 対戦: 霊獣・霊具 (海神 R1 vs 標準装備の海神 R1) ==")
-    for label, unit in (("装備なし", Unit(c["海神"])),
+    print("\n== 対戦: 霊獣・霊具 (海神 R1 vs 標準の付与をした海神 R1) ==")
+    for label, unit in (("付与なし", Unit(c["海神"])),
                         ("同じ★で属性違い(火)", Unit(c["海神"], c["炎狐"], c["焔扇"])),
-                        ("★3の水装備(蛟+潮満玉)", Unit(c["海神"], c["蛟"], c["潮満玉"]))):
+                        ("★3の水の付与(蛟+潮満玉)", Unit(c["海神"], c["蛟"], c["潮満玉"]))):
         print(f"  {label:<20} {winrate(unit, std('水', 4)):.0%}")
 
     print("\n== 対戦: 三番勝負 (先鋒・中堅・大将の2本先取) ==")
