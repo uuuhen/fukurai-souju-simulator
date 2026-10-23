@@ -1,0 +1,1410 @@
+<title>竜と七日の庭</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Kaisei+Decol:wght@700&family=Zen+Maru+Gothic:wght@500;700&display=swap">
+<style>
+/* Layout: 1画面のボードゲーム。上に暦と持ち時間、中央に城壁に囲まれた7×7の庭（東・南・西に光窓）、その真下に地底、下に竜・行商人・「1日を進める」 */
+:root {
+  color-scheme: dark;
+  --ground: #1f3628;        /* 昼: 王宮の生け垣 */
+  --ground-night: #121731;  /* 夜 */
+  --panel: rgba(8, 14, 10, .42);
+  --line: rgba(241, 230, 204, .16);
+  --text: #f1e6cc;
+  --text-dim: #bdb091;
+  --soil: #6b4c31;
+  --soil-alt: #634529;
+  --soil-edge: #3e2a19;
+  --wall: #4f453c;
+  --wall-line: #3a322b;
+  --wall-hi: #7a6c5e;
+  --sun: #ffb22e;
+  --moon: #b8dbff;
+  --shade: #1a0f26;
+  --shade-glow: #b06cff;
+  --leaf: #4f8a3c;
+  --good: #8fd694;
+  --warn: #ffd166;
+  --bad: #ff9a8a;
+  --font-display: "Kaisei Decol", "Hiragino Mincho ProN", "Yu Mincho", serif;
+  --font-ui: "Zen Maru Gothic", "Hiragino Maru Gothic ProN", "Hiragino Sans", "Noto Sans JP", system-ui, sans-serif;
+}
+[hidden] { display: none !important; }
+html, body { height: 100%; }
+body {
+  background: var(--ground);
+  color: var(--text);
+  font-family: var(--font-ui);
+  font-size: 15px;
+  line-height: 1.5;
+  transition: background-color .6s ease;
+}
+body.night { background: var(--ground-night); }
+button { font: inherit; color: inherit; }
+button:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
+
+.app {
+  max-width: 460px;
+  margin: 0 auto;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 10px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+/* ヘッダー・暦・持ち時間 */
+.top { display: flex; align-items: center; gap: 8px; }
+h1 { font-family: var(--font-display); font-size: 21px; margin: 0 auto 0 0; letter-spacing: .06em; }
+.ghost {
+  background: transparent; color: var(--text-dim);
+  border: 1px solid var(--line); border-radius: 999px;
+  padding: 5px 11px; font-size: 13px; cursor: pointer;
+}
+.sky { display: flex; align-items: baseline; gap: 4px 10px; flex-wrap: wrap; font-size: 12.5px; color: var(--text-dim); }
+.sky .day { font-family: var(--font-display); font-size: 19px; color: var(--text); }
+.sky .day small { font-family: var(--font-ui); font-size: 12px; color: var(--text-dim); margin-left: 3px; }
+.sky b { color: var(--text); }
+.sky .bad { color: var(--bad); }
+.sky .good { color: var(--warn); }
+.timer { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 8px; font-size: 12.5px; font-variant-numeric: tabular-nums; }
+.timer-bar { height: 6px; border-radius: 999px; background: rgba(0, 0, 0, .35); overflow: hidden; }
+.timer-bar i { display: block; height: 100%; background: var(--text); border-radius: inherit; }
+.timer.low .timer-bar i { background: var(--warn); }
+.timer.over .timer-bar { background: rgba(255, 154, 138, .35); animation: blink 1s steps(2) infinite; }
+.timer.over #timerText { color: var(--bad); font-weight: 700; }
+@keyframes blink { 50% { opacity: .45; } }
+
+/* 庭 */
+.board-wrap {
+  position: relative;
+  width: min(100%, 54vh);
+  width: min(100%, 54svh);
+  aspect-ratio: 8.2 / 7.9;
+  margin: 0 auto;
+  container-type: inline-size;
+}
+.board {
+  position: absolute; inset: 0; display: grid;
+  grid-template-columns: .6fr repeat(7, 1fr) .6fr;
+  grid-template-rows: .3fr repeat(7, 1fr) .6fr;
+}
+/* 城壁: 上から見た石積み。東・南・西の壁には光窓が並び、北の壁には窓がない */
+.edge { display: grid; place-items: center; background-color: var(--wall); }
+.edge.v { background-image: repeating-linear-gradient(180deg, transparent 0 13px, var(--wall-line) 13px 14px); }
+.edge.h, .edge.north { background-image: repeating-linear-gradient(90deg, transparent 0 13px, var(--wall-line) 13px 14px); }
+.edge.corner { background-color: var(--wall-line); }
+.win {
+  display: flex; align-items: center; justify-content: center; gap: 1px;
+  background: #15110d; box-shadow: inset 0 0 6px rgba(0, 0, 0, .8);
+}
+.edge.v .win { width: 100%; height: 52%; flex-direction: column; border-block: 2px solid var(--wall-hi); }
+.edge.h .win { height: 100%; width: 52%; border-inline: 2px solid var(--wall-hi); }
+.win.off { background: #3b3f45; box-shadow: inset 0 0 6px rgba(0, 0, 0, .6); }
+.win.sun { background: radial-gradient(circle, #fff1c2, var(--sun) 70%); box-shadow: 0 0 12px 2px rgba(255, 178, 46, .7); }
+.win.moon { background: radial-gradient(circle, #f4fbff, #8fb6dd 75%); box-shadow: 0 0 10px 2px rgba(184, 219, 255, .55); }
+.win.moon.dim { background: radial-gradient(circle, #c9d9ea, #5c7088 80%); box-shadow: 0 0 6px rgba(184, 219, 255, .35); }
+.win.moon.strong { box-shadow: 0 0 16px 4px rgba(200, 228, 255, .85); }
+.win.sun.moon { background: linear-gradient(180deg, var(--sun) 50%, var(--moon) 50%); }
+.win.next { outline: 1.5px dashed var(--moon); outline-offset: -1px; }
+.src { display: grid; place-items: center; line-height: 1; flex: none; font-size: 13px; font-size: calc(100cqw * .04); }
+.src.sun { color: #5a3300; }
+.src.moon { color: #1d2d4a; }
+.src.off { color: #9aa0a8; }
+.win.two .src { font-size: calc(100cqw * .03); }
+.shaft { animation: shimmer 3.2s ease-in-out infinite alternate; }
+@keyframes shimmer { from { opacity: .7; } to { opacity: 1; } }
+.cell {
+  position: relative; border: 0; padding: 0; margin: 0;
+  background: var(--soil); box-shadow: inset 0 0 0 .5px var(--soil-edge);
+  display: grid; place-items: center;
+}
+.cell.alt { background: var(--soil-alt); }
+button.cell { cursor: pointer; -webkit-tap-highlight-color: transparent; }
+button.cell:active { filter: brightness(1.18); }
+button.cell:focus-visible { outline: 2px solid var(--text); outline-offset: -2px; z-index: 1; }
+.placing button.cell:not(.has) { box-shadow: inset 0 0 0 1.5px rgba(255, 210, 122, .55); }
+.frame {
+  position: absolute; z-index: 1; pointer-events: none;
+  left: calc(100% * .6 / 8.2); right: calc(100% * .6 / 8.2); top: calc(100% * .3 / 7.9); bottom: calc(100% * .6 / 7.9);
+  border: 2px solid #2a1b0e; border-radius: 3px; box-shadow: 0 8px 20px rgba(0, 0, 0, .35);
+}
+.veil {
+  position: absolute; z-index: 2; pointer-events: none; opacity: 0; transition: opacity .5s ease;
+  left: calc(100% * .6 / 8.2); right: calc(100% * .6 / 8.2); top: calc(100% * .3 / 7.9); bottom: calc(100% * .6 / 7.9);
+}
+.board-wrap[data-phase="morning"] .veil.sunv { background: radial-gradient(circle at 100% 50%, rgba(255, 200, 110, .32), transparent 70%); opacity: 1; }
+.board-wrap[data-phase="noon"] .veil.sunv { background: radial-gradient(circle at 50% 100%, rgba(255, 220, 140, .3), transparent 75%); opacity: 1; }
+.board-wrap[data-phase="evening"] .veil.sunv { background: radial-gradient(circle at 0% 50%, rgba(255, 140, 70, .34), transparent 70%); opacity: 1; }
+body.night .veil.nightv { background: rgba(16, 24, 70, .55); opacity: 1; }
+.quake { animation: quake .5s ease; }
+@keyframes quake { 20% { transform: translate(-3px, 1px); } 40% { transform: translate(3px, -1px); } 60% { transform: translate(-2px, 1px); } 80% { transform: translate(1px, 0); } }
+
+.rock {
+  width: 70%; height: 62%;
+  border-radius: 46% 54% 40% 60% / 55% 45% 55% 45%;
+  background: radial-gradient(circle at 35% 30%, #a59a8a, #5d554b 75%);
+  box-shadow: 0 3px 4px rgba(0, 0, 0, .45);
+}
+.crack {
+  position: absolute; inset: 14%;
+  border-radius: 40% 60% 55% 45% / 50% 40% 60% 50%;
+  background: radial-gradient(circle at 50% 55%, #c38bff 0, #4b1f7a 30%, #120818 70%);
+  box-shadow: 0 0 10px rgba(176, 108, 255, .7);
+  animation: seep 2.2s ease-in-out infinite;
+}
+.crack.new { animation: open .6s ease-out, seep 2.2s ease-in-out .6s infinite; }
+@keyframes seep { 50% { box-shadow: 0 0 16px 3px rgba(176, 108, 255, .85); } }
+@keyframes open { from { transform: scale(.2); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+.egg {
+  width: 46%; height: 58%; border-radius: 50% 50% 46% 46% / 60% 60% 40% 40%;
+  background: radial-gradient(circle at 35% 30%, #fffaf0, #d8c7a4 75%);
+  box-shadow: 0 3px 5px rgba(0, 0, 0, .4);
+}
+.mirror {
+  position: absolute; left: 2%; top: 44%; width: 96%; height: 12%; border-radius: 2px;
+  background: linear-gradient(180deg, #ffffff, #b9c7d6 55%, #7d8da0);
+  box-shadow: 0 0 6px rgba(220, 235, 255, .8);
+}
+.mirror.slash { transform: rotate(-45deg); }
+.mirror.back { transform: rotate(45deg); }
+.mirror.vane { background: linear-gradient(180deg, #ffe7b0, #c8964a 55%, #8a5f24); box-shadow: 0 0 6px rgba(255, 210, 140, .7); }
+.vane-pin {
+  position: absolute; width: 22%; height: 22%; border-radius: 50%; background: #2a1b0e; border: 2px solid #e0b46a;
+  display: grid; place-items: center; font-size: calc(100cqw * .022); color: #ffe7b0; line-height: 1;
+}
+.prism {
+  width: 58%; height: 58%; transform: rotate(45deg); border-radius: 3px;
+  background: conic-gradient(from 0deg, #ff9fd1, #ffe28a, #9dffb5, #8ad7ff, #c8a2ff, #ff9fd1);
+  box-shadow: 0 0 10px rgba(255, 255, 255, .55); opacity: .92;
+}
+.vine {
+  position: absolute; inset: 8%;
+  border-radius: 45% 55% 50% 50%;
+  background: radial-gradient(circle at 30% 30%, #8fd06a, var(--leaf) 55%, #2b5220);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, .4);
+}
+.vine::after { content: ""; position: absolute; inset: 30%; border-radius: 50%; border: 2px solid rgba(20, 50, 15, .55); border-left-color: transparent; }
+.sprout { position: absolute; inset: 18%; border-radius: 50%; border: 2px dashed rgba(143, 208, 106, .8); }
+
+.token {
+  position: relative; width: 78%; aspect-ratio: 1; border-radius: 50%;
+  display: grid; place-items: center; line-height: 1;
+  font-family: var(--font-display); font-size: calc(100cqw * .046);
+  transition: box-shadow .3s ease;
+}
+.token.sun { background: radial-gradient(circle at 35% 30%, #ffd98a, #d9771f 70%); color: #3b1d00; box-shadow: 0 0 0 2px #ffcf6e, 0 3px 6px rgba(0, 0, 0, .4); }
+.token.moon { background: radial-gradient(circle at 35% 30%, #e6f3ff, #5a7fb8 72%); color: #0f1c38; box-shadow: 0 0 0 2px #cfe6ff, 0 3px 6px rgba(0, 0, 0, .4); }
+.token.lit-sun { box-shadow: 0 0 0 2px #fff1c9, 0 0 14px 4px var(--sun); }
+.token.lit-moon { box-shadow: 0 0 0 2px #f2f9ff, 0 0 14px 4px var(--moon); }
+.token.lit-sun.lit-moon { box-shadow: 0 0 0 2px #fff, 0 0 10px 3px var(--sun), 0 0 20px 7px var(--moon); }
+.token .lv {
+  position: absolute; right: -10%; bottom: -10%;
+  font-family: var(--font-ui); font-weight: 700; font-size: calc(100cqw * .025);
+  background: #1b130c; color: var(--text); border-radius: 999px; padding: 1px 5px;
+  font-variant-numeric: tabular-nums;
+}
+
+svg.beams { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 3; pointer-events: none; overflow: visible; }
+.beam { fill: none; stroke-linecap: round; stroke-linejoin: round; }
+.beam.sun { stroke: var(--sun); }
+.beam.moon { stroke: var(--moon); }
+.beam.preview { stroke-width: .06; stroke-dasharray: .16 .12; opacity: .85; }
+.beam.fire { stroke-width: .16; }
+
+.floats { position: absolute; inset: 0; z-index: 4; pointer-events: none; }
+.float {
+  position: absolute; transform: translate(-50%, -50%); white-space: nowrap;
+  font-weight: 700; font-size: calc(100cqw * .042); text-shadow: 0 1px 3px rgba(0, 0, 0, .8);
+  animation: floatUp 1.3s ease-out forwards;
+}
+.float.sun { color: #ffd27a; }
+.float.moon { color: #e2f1ff; }
+.float.lvup { color: #fff; font-size: calc(100cqw * .034); }
+.float.shade { color: #d9b8ff; font-size: calc(100cqw * .032); }
+.float.leaf { color: #b8f09a; font-size: calc(100cqw * .032); }
+@keyframes floatUp { 0% { opacity: 0; transform: translate(-50%, -30%); } 15% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%, -170%); } }
+
+/* 地底 */
+.under {
+  display: grid; grid-template-columns: 64px 1fr; gap: 10px;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 8px;
+}
+.strata {
+  position: relative; height: 88px; border-radius: 8px; overflow: hidden;
+  background: repeating-linear-gradient(180deg, #3d2a1b 0 9px, #33231a 9px 18px, #2a1d16 18px 27px);
+}
+.strata::before { content: ""; position: absolute; inset: 0 0 auto; height: 4px; background: #6b8f4e; }
+.strata .depthmark { position: absolute; left: 3px; font-size: 9px; color: rgba(241, 230, 204, .45); font-variant-numeric: tabular-nums; }
+.shade-icon {
+  position: absolute; left: 50%; width: 44px; height: 26px; border-radius: 50% 50% 40% 40%;
+  background: radial-gradient(circle at 50% 60%, #4a2870, var(--shade) 75%);
+  box-shadow: 0 0 12px rgba(176, 108, 255, .55);
+  transform: translate(-50%, -50%);
+  transition: top .9s cubic-bezier(.3, .7, .3, 1);
+  display: flex; justify-content: center; align-items: center; gap: 9px;
+}
+.shade-icon i { width: 7px; height: 4px; border-radius: 50%; background: var(--shade-glow); box-shadow: 0 0 6px var(--shade-glow); }
+.shade-icon.near i { animation: pulse 1.1s ease-in-out infinite; }
+@keyframes pulse { 50% { box-shadow: 0 0 12px 3px var(--shade-glow); } }
+.under-info { min-width: 0; display: grid; gap: 2px; align-content: center; }
+.under-line { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.under-line strong { font-family: var(--font-display); font-size: 16px; color: #e2c9ff; letter-spacing: .04em; }
+.under-line span { font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.under-meta { font-size: 12px; color: var(--text-dim); font-variant-numeric: tabular-nums; }
+.under-meta b { color: var(--text); }
+.eta.bad { color: var(--bad); font-weight: 700; }
+.eta.warn { color: var(--warn); }
+
+/* 決戦の見込み */
+.odds {
+  background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 8px 12px;
+  display: grid; gap: 5px;
+}
+.odds-line { display: flex; justify-content: space-between; gap: 4px 8px; flex-wrap: wrap; font-size: 12.5px; font-variant-numeric: tabular-nums; }
+.odds-line b { font-size: 14px; }
+.verdict.good { color: var(--good); font-weight: 700; }
+.verdict.warn { color: var(--warn); font-weight: 700; }
+.verdict.bad { color: var(--bad); font-weight: 700; }
+.range { position: relative; height: 10px; border-radius: 999px; background: rgba(0, 0, 0, .35); overflow: hidden; }
+.range i { position: absolute; top: 0; bottom: 0; border-radius: 999px; transition: left .4s ease, width .4s ease; }
+.range .span { background: linear-gradient(90deg, var(--sun), #ffe1a0); opacity: .85; }
+.range .hp { width: 2px; background: #e2c9ff; box-shadow: 0 0 6px var(--shade-glow); border-radius: 0; }
+.sun-t { color: var(--sun); }
+.moon-t { color: var(--moon); }
+
+/* 竜のカード */
+.dragons { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.dcard {
+  display: flex; gap: 8px; align-items: center; min-width: 0;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 7px 8px;
+}
+.dcard .token { width: 32px; flex: none; font-size: 15px; }
+.dcard.egg-card { color: var(--text-dim); }
+.dcard .egg { width: 22px; height: 28px; flex: none; margin: 0 5px; }
+.dinfo { min-width: 0; display: grid; gap: 1px; flex: 1; }
+.dname { font-weight: 700; font-size: 13.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dname small { font-weight: 500; color: var(--text-dim); font-size: 11px; margin-left: 4px; }
+.dlv { display: flex; align-items: center; gap: 6px; font-size: 12px; font-variant-numeric: tabular-nums; }
+.xpbar { flex: 1; min-width: 20px; height: 5px; background: rgba(0, 0, 0, .35); border-radius: 999px; overflow: hidden; }
+.xpbar i { display: block; height: 100%; background: var(--text); transition: width .3s ease; }
+.dtoday { font-size: 12px; color: var(--text-dim); font-variant-numeric: tabular-nums; }
+
+/* 行商人 */
+.shop { display: grid; gap: 6px; }
+.shop-head { display: flex; align-items: baseline; gap: 14px; font-size: 14px; font-variant-numeric: tabular-nums; }
+.shop-head .label { color: var(--text-dim); font-size: 12.5px; margin-right: 3px; }
+.shop-head .title { font-size: 12.5px; color: var(--text-dim); margin-left: auto; }
+.wares { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.ware {
+  display: grid; gap: 1px; text-align: left; min-width: 0; cursor: pointer;
+  background: rgba(241, 230, 204, .05); border: 1px solid var(--line); border-radius: 10px; padding: 6px 8px;
+}
+.ware b { font-size: 13px; }
+.ware span { font-size: 11px; color: var(--text-dim); line-height: 1.35; }
+.ware em { font-style: normal; font-size: 12px; color: var(--warn); font-variant-numeric: tabular-nums; }
+.ware:disabled { opacity: .4; cursor: default; }
+.ware.sold { opacity: .3; }
+
+.actionbar {
+  position: sticky; bottom: 0; z-index: 5;
+  padding-block: 8px calc(10px + env(safe-area-inset-bottom, 0px));
+  background: linear-gradient(180deg, transparent, var(--ground) 30%);
+  display: grid; gap: 4px;
+}
+body.night .actionbar { background: linear-gradient(180deg, transparent, var(--ground-night) 30%); }
+.primary {
+  width: 100%; border: 0; border-radius: 12px; padding: 13px; cursor: pointer;
+  font-weight: 700; font-size: 16px; color: #3a2200;
+  background: linear-gradient(180deg, #ffc552, var(--sun)); box-shadow: 0 3px 0 #b8741a;
+}
+.primary:active { transform: translateY(2px); box-shadow: 0 1px 0 #b8741a; }
+.primary:disabled { filter: grayscale(.6) brightness(.75); cursor: default; }
+.secondary {
+  width: 100%; border: 1px solid var(--line); border-radius: 12px; padding: 11px; cursor: pointer;
+  background: transparent; font-size: 14px; color: var(--text-dim);
+}
+.hint { margin: 0; font-size: 12px; color: var(--text-dim); text-align: center; }
+.hint button { background: none; border: 0; color: var(--warn); text-decoration: underline; padding: 0 4px; cursor: pointer; }
+
+/* 重ねて出す画面 */
+.overlay {
+  position: fixed; inset: 0; z-index: 20; overflow-y: auto;
+  display: grid; place-items: end center;
+  background: rgba(5, 8, 6, .6);
+  padding: calc(16px + env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) calc(16px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px));
+}
+.overlay.solid { background: rgba(5, 8, 6, .94); place-items: center; }
+.sheet {
+  width: 100%; max-width: 440px; display: grid; gap: 10px;
+  background: #15231a; border: 1px solid var(--line); border-radius: 16px; padding: 18px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, .5);
+}
+.sheet h2 { font-family: var(--font-display); font-size: 25px; margin: 0; letter-spacing: .06em; text-wrap: balance; }
+.eyebrow { margin: 0; font-size: 11px; letter-spacing: .16em; color: var(--text-dim); }
+.story { margin: 0; }
+.howto { margin: 0; padding-left: 1.2em; display: grid; gap: 4px; font-size: 13px; color: var(--text-dim); }
+.howto b { font-weight: 700; color: var(--text); }
+.facts { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; font-size: 13.5px; }
+.facts dt { color: var(--text-dim); }
+.facts dd { margin: 0; font-variant-numeric: tabular-nums; }
+.newgim { margin: 0; padding: 10px 12px; border-radius: 10px; background: rgba(255, 209, 102, .1); border: 1px solid rgba(255, 209, 102, .3); font-size: 13.5px; }
+.newgim b { color: var(--warn); }
+
+.battle { place-items: center; background: rgba(8, 4, 14, .86); }
+.battle .sheet { background: #150d20; border-color: rgba(176, 108, 255, .3); }
+.battle-sum { margin: 0; font-size: 12.5px; color: var(--text-dim); font-variant-numeric: tabular-nums; }
+.boss-big {
+  position: relative; height: 104px; border-radius: 12px; overflow: hidden;
+  display: grid; place-items: center;
+  background: radial-gradient(circle at 50% 60%, #4a2870, var(--shade) 70%);
+  font-family: var(--font-display); font-size: 54px; color: rgba(176, 108, 255, .3);
+}
+.boss-big .eyes { position: absolute; top: 34%; left: 0; right: 0; display: flex; justify-content: center; gap: 44px; }
+.boss-big .eyes i { width: 18px; height: 11px; border-radius: 50%; background: var(--shade-glow); box-shadow: 0 0 14px 3px var(--shade-glow); }
+.boss-big.rise { animation: rise 1.4s cubic-bezier(.2, .8, .3, 1); }
+.boss-big.hit { animation: shake .3s ease; }
+@keyframes rise { from { transform: translateY(60px); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes shake { 25% { transform: translateX(-5px); } 50% { transform: translateX(4px); } 75% { transform: translateX(-2px); } }
+.hpbar { height: 12px; border-radius: 999px; background: rgba(0, 0, 0, .4); overflow: hidden; }
+.hpbar i { display: block; height: 100%; width: 100%; background: linear-gradient(90deg, #7a3cc9, var(--shade-glow)); transition: width .4s ease; }
+.hpnum { margin: 0; text-align: right; font-size: 12px; color: var(--text-dim); font-variant-numeric: tabular-nums; }
+.log { list-style: none; margin: 0; padding: 0; display: grid; gap: 3px; font-size: 13.5px; }
+.log .round { color: var(--text-dim); font-size: 12px; text-align: center; }
+.log .sun { color: #ffd27a; }
+.log .moon { color: #e2f1ff; }
+.log .shade { color: #cfa6ff; }
+.log .crit { font-weight: 700; }
+.result { display: grid; gap: 8px; }
+.result h3 { font-family: var(--font-display); font-size: 22px; margin: 4px 0 0; }
+.result h3.win { color: #ffd27a; }
+.result h3.lose { color: #cfa6ff; }
+.result p { margin: 0; }
+.note { font-size: 12px; color: var(--text-dim); }
+
+.toast {
+  position: fixed; left: 50%; z-index: 30; pointer-events: none;
+  top: calc(12px + env(safe-area-inset-top, 0px));
+  transform: translate(-50%, -20px); opacity: 0; transition: opacity .25s ease, transform .25s ease;
+  background: #0d1510; border: 1px solid var(--line); border-radius: 999px;
+  padding: 9px 16px; font-size: 13px; text-align: center; max-width: calc(100% - 32px);
+}
+.toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+}
+</style>
+
+<main class="app">
+  <header class="top">
+    <h1>竜と七日の庭</h1>
+    <button type="button" class="ghost" id="pauseBtn">一時停止</button>
+    <button type="button" class="ghost" id="helpBtn">遊び方</button>
+  </header>
+
+  <div class="sky" id="sky"></div>
+  <div class="timer" id="timer"><div class="timer-bar"><i id="timerFill"></i></div><span id="timerText"></span></div>
+
+  <div class="board-wrap" id="boardWrap">
+    <div class="board" id="board"></div>
+    <div class="frame"></div>
+    <div class="veil sunv"></div>
+    <div class="veil nightv"></div>
+    <svg class="beams" viewBox="0 0 8.2 7.9" preserveAspectRatio="none" aria-hidden="true">
+      <defs>
+        <filter id="glow" filterUnits="userSpaceOnUse" x="-1" y="-1" width="10.2" height="9.9">
+          <feGaussianBlur stdDeviation=".07" result="b"></feGaussianBlur>
+          <feMerge><feMergeNode in="b"></feMergeNode><feMergeNode in="SourceGraphic"></feMergeNode></feMerge>
+        </filter>
+        <linearGradient id="shaft-sun-E" x1="1" y1="0" x2="0" y2="0"><stop offset="0" stop-color="#ffd27a" stop-opacity=".55"></stop><stop offset="1" stop-color="#ffd27a" stop-opacity="0"></stop></linearGradient>
+        <linearGradient id="shaft-sun-W" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#ffb46a" stop-opacity=".55"></stop><stop offset="1" stop-color="#ffb46a" stop-opacity="0"></stop></linearGradient>
+        <linearGradient id="shaft-sun-S" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#ffe2a0" stop-opacity=".55"></stop><stop offset="1" stop-color="#ffe2a0" stop-opacity="0"></stop></linearGradient>
+        <linearGradient id="shaft-moon-E" x1="1" y1="0" x2="0" y2="0"><stop offset="0" stop-color="#cfe6ff" stop-opacity=".45"></stop><stop offset="1" stop-color="#cfe6ff" stop-opacity="0"></stop></linearGradient>
+        <linearGradient id="shaft-moon-W" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#cfe6ff" stop-opacity=".45"></stop><stop offset="1" stop-color="#cfe6ff" stop-opacity="0"></stop></linearGradient>
+        <linearGradient id="shaft-moon-S" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#cfe6ff" stop-opacity=".45"></stop><stop offset="1" stop-color="#cfe6ff" stop-opacity="0"></stop></linearGradient>
+      </defs>
+      <g id="shafts"></g>
+      <g id="beams"></g>
+    </svg>
+    <div class="floats" id="floats"></div>
+  </div>
+
+  <section class="under" aria-label="地底の影の竜">
+    <div class="strata">
+      <span class="depthmark" style="top:6px">0m</span>
+      <span class="depthmark" style="bottom:2px">80m</span>
+      <div class="shade-icon" id="shadeIcon"><i></i><i></i></div>
+    </div>
+    <div class="under-info">
+      <div class="under-line"><strong>影の竜</strong><span id="depthText"></span></div>
+      <div class="under-meta" id="riseText"></div>
+      <div class="under-meta eta" id="etaText"></div>
+    </div>
+  </section>
+
+  <section class="odds" aria-label="決戦の見込み">
+    <div class="odds-line"><span>影の竜 体力 <b id="bossHp"></b>・弱点 <b class="moon-t">月光</b></span><span class="verdict" id="verdict"></span></div>
+    <div class="range" id="range" role="img"><i class="span" id="rangeSpan"></i><i class="hp" id="rangeHp"></i></div>
+    <div class="odds-line"><span id="oddsText"></span></div>
+  </section>
+
+  <div class="dragons" id="dragons"></div>
+
+  <section class="shop" aria-label="行商人">
+    <div class="shop-head">
+      <span><span class="label">鱗</span><b id="scales">0</b></span>
+      <span><span class="label">鏡</span><b id="mirrorCount">0/3</b></span>
+      <span class="title">今朝の行商人</span>
+    </div>
+    <div class="wares" id="wares"></div>
+  </section>
+
+  <div class="actionbar">
+    <button type="button" class="primary" id="goBtn">この配置で1日を進める</button>
+    <p class="hint" id="hint"></p>
+  </div>
+</main>
+
+<div class="overlay" id="intro">
+  <div class="sheet">
+    <p class="eyebrow">試作品 v0.3</p>
+    <h2>竜と七日の庭</h2>
+    <p class="story">王宮の地の底で、影の竜が目を覚ましつつある。地上に出れば王国は闇に沈む。飼育係のあなたに託されたのは、まだ幼い二頭の竜と、城壁に囲まれた小さな庭だけ。</p>
+    <ul class="howto">
+      <li>光は城壁の窓からしか入りません。<b class="sun-t">朝日は東（右）・昼の日差しは南（下）・夕日は西（左）</b>の決まった窓から差します。窓の位置はステージごとに変わります。</li>
+      <li><b class="moon-t">月</b>は夕方の空で、日ごとに西から南、東へと移りながら満ちていきます（三日月→半月→十三夜で月光が2倍）。明日の月の位置は点線の丸で見えます。</li>
+      <li>天気は気まぐれです。朝霧・曇り・夕立で日差しが1つ欠ける日があります（明日の天気は予報で見えます）。</li>
+      <li>マスをタップすると鏡を置けます（置く→向きを変える→外す）。<b>1つの配置で朝・昼・夕・夜の4本の光をさばきます</b>。</li>
+      <li>光が通った竜が育ちます。好きな光なら+3、そうでなければ+1。<b>1本の光で何頭も照らすと、2頭目から1頭につき全員に+2</b>。照らした竜1頭につき鱗が1枚落ちます。</li>
+      <li>影の竜は毎晩12mずつ上がり、庭の<b>裂け目</b>1つにつき5m速くなります。裂け目は夜ごとに増えていきます。<b>光の行き止まりを裂け目にすると封じられ</b>、3m押し戻せます。</li>
+      <li>毎朝の<b>持ち時間</b>を過ぎると、1秒ごとに影の竜が上がってきます。早く決めると残り10秒ごとに鱗が1枚もらえます。</li>
+      <li>影の竜が地上に出たら決戦。勝つと次のステージへ進み、<b>竜は育ったまま連れていけます</b>（負けたらそのステージを始めたときの竜に戻ってやり直し）。ステージが進むと仕掛けが増え、影の竜も強くなります。</li>
+    </ul>
+    <button type="button" class="primary" id="startBtn">庭へ出る</button>
+  </div>
+</div>
+
+<div class="overlay solid" id="stageCard" hidden>
+  <div class="sheet">
+    <p class="eyebrow" id="stageEyebrow"></p>
+    <h2 id="stageTitle"></h2>
+    <p class="newgim" id="stageNew" hidden></p>
+    <dl class="facts" id="stageFacts"></dl>
+    <button type="button" class="primary" id="stageStartBtn">始める</button>
+  </div>
+</div>
+
+<div class="overlay solid" id="pause" hidden>
+  <div class="sheet">
+    <p class="eyebrow">一時停止中</p>
+    <h2>持ち時間を止めています</h2>
+    <button type="button" class="primary" id="resumeBtn">再開する</button>
+  </div>
+</div>
+
+<div class="overlay battle" id="battle" hidden>
+  <div class="sheet">
+    <p class="eyebrow" id="battleEyebrow"></p>
+    <h2>影の竜が地上に現れた</h2>
+    <p class="battle-sum" id="battleSum"></p>
+    <div class="boss-big" id="bossBig"><span class="eyes"><i></i><i></i></span>影</div>
+    <div class="hpbar"><i id="bossBar"></i></div>
+    <p class="hpnum"><span id="bossHpNow"></span> / <span id="bossHpMax"></span></p>
+    <ol class="log" id="log" aria-live="polite"></ol>
+    <div class="result" id="result" hidden>
+      <h3 id="resultTitle"></h3>
+      <p id="resultText"></p>
+      <p class="note" id="recordText"></p>
+      <button type="button" class="primary" id="nextBtn"></button>
+      <button type="button" class="secondary" id="restartBtn">ステージ1から始め直す</button>
+      <p class="note">試作品 v0.3。難しさや楽しさの感想をチャットで送ってください。</p>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+// ---- ゲームの設定（バランス調整はここ） ----
+const SIZE = 7;                 // 庭は7×7マス
+const EDGE = 0.6;               // 東・南・西の城壁（光窓）の厚さ（マス単位）
+const TOP = 0.3;                // 北の城壁の厚さ（北から日は差さないので窓はない）
+const W_UNITS = SIZE + EDGE * 2, H_UNITS = TOP + SIZE + EDGE;
+const MAX_DAYS = 10;            // 10日目の夜には必ず現れる
+const START_DEPTH = 70;         // 影の竜の最初の深さ(m)
+const DEPTH_CAP = 80;
+const RISE_BASE = 12;           // 毎晩上がる基本の深さ
+const RISE_PER_CRACK = 5;       // 開いた裂け目1つにつき追加で上がる
+const SEAL_PUSH = 3;            // 裂け目を封じると押し戻す深さ
+const START_MIRRORS = 3;
+const MAX_MIRRORS = 6;
+const START_SCALES = 3;
+const MAX_DRAGONS = 4;          // 卵を含む
+const GAIN_LIKED = 3;           // 好きな光の成長
+const GAIN_OTHER = 1;           // 好きではない光の成長
+const CHAIN_BONUS = 2;          // 1本の光で照らした2頭目以降1頭につき、全員に加わる成長
+const XP_PER_LEVEL = 4;
+const ATK_PER_LEVEL = 5;
+const BOSS_WEAK = 'moon';
+const WEAK_MULT = 1.5;
+const ROUNDS = 3;
+const CRIT_RATE = 0.2;
+const CRIT_MULT = 1.5;
+const TIME_BONUS_STEP = 10;     // 持ち時間が10秒残るごとに鱗1枚
+// ステージごとの影の竜の体力。AIに遊ばせて、勝率がステージ1で約60%、以降50・45・40・35・30%になるよう決めた
+const BOSS_HP = [250, 690, 1020, 1480, 2150, 2690];
+
+// ステージごとの難しさ。仕掛けは1種類ずつ増える
+function stageParams(n) {
+  return {
+    hp: BOSS_HP[n - 1] ?? Math.round(BOSS_HP[BOSS_HP.length - 1] * Math.pow(1.2, n - BOSS_HP.length)),
+    time: Math.max(30, 65 - n * 5),           // 毎朝の持ち時間(秒)
+    overRise: n >= 4 ? 2 : 1,                 // 持ち時間を過ぎたあと1秒ごとに上がる深さ
+    rocks: n === 1 ? 4 : 3,
+    vanes: n >= 2 ? Math.min(3, 1 + Math.floor(n / 3)) : 0,
+    vines: n >= 3 ? (n >= 6 ? 2 : 1) : 0,
+    prisms: n >= 4 ? (n >= 7 ? 2 : 1) : 0,
+  };
+}
+const GIMMICKS = {
+  2: { name: '風見鏡', text: '動かせない鏡です。毎晩、向きが変わります。' },
+  3: { name: '蔓', text: '光をさえぎります。毎晩1マスずつ伸びます。次に伸びるマスは点線で見えます。' },
+  4: { name: 'プリズム', text: '光を左右の2本に分けます。分かれた光が照らした竜も、同じ1本の光として連鎖に数えます。' },
+};
+const WEATHER = {
+  sunny:  { name: '晴れ', morning: 1, noon: 1, evening: 1, weight: 55 },
+  mist:   { name: '朝霧', morning: 0, noon: 1, evening: 1, weight: 15, note: '朝日なし' },
+  cloudy: { name: '曇り', morning: 1, noon: 0, evening: 1, weight: 15, note: '昼の日差しなし' },
+  shower: { name: '夕立', morning: 1, noon: 1, evening: 0, weight: 15, note: '夕日なし' },
+};
+// 月の通り道: 夕方の空で西（左の壁を上から下）→ 南（下の壁を左から右）→ 東（右の壁を下から上）
+const MOON_PATH = [
+  ...Array.from({ length: SIZE }, (_, i) => ({ side: 'W', pos: i })),
+  ...Array.from({ length: SIZE }, (_, i) => ({ side: 'S', pos: i })),
+  ...Array.from({ length: SIZE }, (_, i) => ({ side: 'E', pos: SIZE - 1 - i })),
+];
+const MOON_PHASES = [
+  { name: '三日月', mult: 1, glyph: '☽', dim: true },
+  { name: '半月', mult: 1, glyph: '◐' },
+  { name: '十三夜', mult: 2, glyph: '' },
+];
+function moonOf(day) {
+  const p = MOON_PATH[Math.min(MOON_PATH.length - 1, 1 + (day - 1) * 2)];
+  const phase = p.side === 'W' ? 0 : p.side === 'S' ? 1 : 2;
+  return { ...p, ...MOON_PHASES[phase] };
+}
+const WARES = {
+  mirror: { name: '鏡', price: 4, text: '鏡が1枚増える' },
+  egg:    { name: '竜の卵', price: 6, text: '明日の朝かえる' },
+  seal:   { name: '封印の札', price: 5, text: '影を15m押し戻す' },
+  feast:  { name: '竜のごちそう', price: 5, text: '全員の成長+2' },
+  incense:{ name: '満月の香', price: 4, text: '今夜の月光×2' },
+};
+const SEAL_CHARM_PUSH = 15;
+const HATCH_NAMES = { sun: ['ホムラ', 'アサヒ', 'カガリ', 'ヒバナ'], moon: ['シズク', 'ヨイ', 'サヤ', 'ミナモ'] };
+
+const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const $ = id => document.getElementById(id);
+const board = $('board'), beamsG = $('beams'), floats = $('floats');
+const clone = o => JSON.parse(JSON.stringify(o));
+
+// ---- 乱数（途中から再開できるよう状態ごと保存する） ----
+function rand() {
+  let t = (S.rng = (S.rng + 0x6D2B79F5) >>> 0);
+  t = Math.imul(t ^ (t >>> 15), t | 1);
+  t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+  return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+}
+const randInt = n => Math.floor(rand() * n);
+function pickWeather() {
+  const total = Object.values(WEATHER).reduce((a, w) => a + w.weight, 0);
+  let x = rand() * total;
+  for (const [k, w] of Object.entries(WEATHER)) { x -= w.weight; if (x < 0) return k; }
+  return 'sunny';
+}
+
+// ---- 盤面 ----
+const key = (r, c) => r + ',' + c;
+const unkey = k => k.split(',').map(Number);
+const inside = (r, c) => r >= 0 && r < SIZE && c >= 0 && c < SIZE;
+const P = () => stageParams(S.stage);
+
+function newRun(seed) {
+  S = {
+    screen: 'intro', stage: 1, rng: seed >>> 0, paused: false,
+    dragons: [
+      { id: 'hinata', name: 'ヒナタ', type: 'sun', r: 4, c: 1, xp: 0 },
+      { id: 'tsukuyo', name: 'ツクヨ', type: 'moon', r: 2, c: 4, xp: 0 },
+    ],
+    hatched: 0,
+    records: { time: 0, cleared: 0 },
+  };
+  startStage(seed);
+  S.screen = 'intro';
+}
+
+function startStage(seed) {
+  S.stageSeed = seed >>> 0;
+  S.rng = S.stageSeed;
+  S.teamAtStart = clone(S.dragons);
+  const p = P();
+  Object.assign(S, {
+    day: 1, depth: START_DEPTH, cracks: [], newCracks: [], mirrors: {}, owned: START_MIRRORS,
+    scales: START_SCALES, eggs: [], placing: null, incense: false, sealedTotal: 0, lastHatch: '',
+    rocks: [], vanes: {}, vines: [], vineNext: [], prisms: [],
+  });
+  S.garden = { east: randInt(SIZE), south: randInt(SIZE), west: randInt(SIZE) };
+  for (let i = 0; i < p.rocks; i++) S.rocks.push(randomEmpty());
+  for (let i = 0; i < p.vanes; i++) { const k = randomEmpty(); if (k) S.vanes[k] = rand() < .5 ? '/' : '\\'; }
+  for (let i = 0; i < p.prisms; i++) { const k = randomEmpty(); if (k) S.prisms.push(k); }
+  for (let i = 0; i < p.vines; i++) { const k = randomEmpty(); if (k) S.vines.push([k]); }
+  S.cracks.push(randomEmpty());
+  S.forecast = [{ weather: 'sunny' }, { weather: pickWeather() }];
+  computeVineNext();
+  rollWares();
+  S.timeLeft = p.time;
+  S.overAcc = 0;
+  S.screen = 'stage';
+}
+
+function occupied(r, c) {
+  const k = key(r, c);
+  return S.rocks.includes(k) || S.cracks.includes(k) || !!S.mirrors[k] || !!S.vanes[k] || S.prisms.includes(k)
+    || S.vines.some(v => v.includes(k)) || S.vineNext.includes(k)
+    || S.eggs.some(e => e.k === k) || !!dragonAt(r, c);
+}
+function randomEmpty() {
+  for (let i = 0; i < 300; i++) {
+    const r = randInt(SIZE), c = randInt(SIZE);
+    if (!occupied(r, c)) return key(r, c);
+  }
+  return null;
+}
+function rollWares() {
+  const pool = ['egg', 'seal', 'feast', 'incense'];
+  const a = pool.splice(randInt(pool.length), 1)[0];
+  const b = pool.splice(randInt(pool.length), 1)[0];
+  S.wares = ['mirror', a, b];
+  S.sold = [];
+}
+// 蔓は庭の中心に近づく向きを優先して1マスずつ伸びる（毎回同じ規則なので先が読める）
+function computeVineNext() {
+  S.vineNext = [];
+  for (const v of S.vines) {
+    const [r, c] = unkey(v[v.length - 1]);
+    const dirs = [[-1, 0], [1, 0], [0, -1], [0, 1]]
+      .map(([dr, dc]) => ({ r: r + dr, c: c + dc }))
+      .filter(p => inside(p.r, p.c) && !occupied(p.r, p.c))
+      .sort((a, b) => (Math.abs(a.r - 3) + Math.abs(a.c - 3)) - (Math.abs(b.r - 3) + Math.abs(b.c - 3)) || a.r - b.r || a.c - b.c);
+    const n = dirs[0] ? key(dirs[0].r, dirs[0].c) : null;
+    S.vineNext.push(n);
+  }
+  S.vineNext = S.vineNext.filter(Boolean);
+}
+
+// ---- ルール ----
+const today = () => S.forecast[0];
+const dragonAt = (r, c) => S.dragons.find(d => d.r === r && d.c === c);
+const level = xp => 1 + Math.floor(xp / XP_PER_LEVEL);
+const attackAt = (d, xp = d.xp) => level(xp) * ATK_PER_LEVEL * (d.type === BOSS_WEAK ? WEAK_MULT : 1);
+const mirrorsUsed = () => Object.keys(S.mirrors).length;
+
+function sources() {
+  const w = WEATHER[today().weather], g = S.garden, m = moonOf(S.day);
+  return [
+    { id: 'morning', light: 'sun', label: '朝日', side: 'E', pos: g.east, mult: w.morning },
+    { id: 'noon', light: 'sun', label: '昼の日差し', side: 'S', pos: g.south, mult: w.noon },
+    { id: 'evening', light: 'sun', label: '夕日', side: 'W', pos: g.west, mult: w.evening },
+    { id: 'night', light: 'moon', label: m.name, side: m.side, pos: m.pos, mult: m.mult * (S.incense ? 2 : 1) },
+  ];
+}
+const center = (r, c) => [EDGE + c + .5, TOP + r + .5];
+function entry(side, pos) {
+  if (side === 'E') return { r: pos, c: SIZE - 1, dr: 0, dc: -1, pt: [EDGE + SIZE + EDGE / 2, TOP + pos + .5] };
+  if (side === 'W') return { r: pos, c: 0, dr: 0, dc: 1, pt: [EDGE / 2, TOP + pos + .5] };
+  return { r: SIZE - 1, c: pos, dr: -1, dc: 0, pt: [EDGE + pos + .5, TOP + SIZE + EDGE / 2] };
+}
+
+// 光の通り道。竜と卵は光を通し、岩と蔓は止め、裂け目は光を吸って封じられ、プリズムは左右に分ける
+function trace(src) {
+  const res = { ...src, paths: [], lit: [], seals: [], gains: {} };
+  if (!src.mult) return res;
+  const e = entry(src.side, src.pos);
+  const queue = [{ r: e.r, c: e.c, dr: e.dr, dc: e.dc, pts: [e.pt] }];
+  const seen = new Set();
+  while (queue.length) {
+    let { r, c, dr, dc, pts } = queue.shift();
+    let end = 'exit';
+    while (inside(r, c)) {
+      const k = key(r, c), sk = `${k},${dr},${dc}`;
+      if (seen.has(sk)) { end = 'loop'; break; }
+      seen.add(sk);
+      if (S.rocks.includes(k) || S.vines.some(v => v.includes(k))) { end = 'block'; break; }
+      if (S.cracks.includes(k)) { end = 'crack'; if (!res.seals.includes(k)) res.seals.push(k); break; }
+      pts.push(center(r, c));
+      const d = dragonAt(r, c);
+      if (d && !res.lit.includes(d)) res.lit.push(d);
+      if (S.prisms.includes(k)) {
+        for (const [nr, nc] of [[dc, dr], [-dc, -dr]]) queue.push({ r: r + nr, c: c + nc, dr: nr, dc: nc, pts: [center(r, c)] });
+        end = 'split';
+        break;
+      }
+      const m = S.mirrors[k] || S.vanes[k];
+      if (m === '/') [dr, dc] = [-dc, -dr];
+      else if (m === '\\') [dr, dc] = [dc, dr];
+      r += dr; c += dc;
+    }
+    if (end !== 'loop' && end !== 'split') {
+      const back = end === 'crack' ? .15 : .5;
+      const [x, y] = center(r, c);
+      pts.push([x - dc * back, y - dr * back]);
+    }
+    if (pts.length > 1) res.paths.push(pts);
+  }
+  const chain = res.lit.length - 1;
+  for (const d of res.lit) res.gains[d.id] = ((d.type === src.light ? GAIN_LIKED : GAIN_OTHER) + chain * CHAIN_BONUS) * src.mult;
+  return res;
+}
+
+function dayPlan() {
+  const traces = sources().map(trace);
+  const sealed = new Set(traces.flatMap(t => t.seals));
+  const open = S.cracks.length - sealed.size;
+  const change = -RISE_BASE - RISE_PER_CRACK * open + SEAL_PUSH * sealed.size;
+  const gains = {};
+  for (const d of S.dragons) {
+    gains[d.id] = { sun: 0, moon: 0 };
+    for (const t of traces) gains[d.id][t.light] += t.gains[d.id] || 0;
+  }
+  return { traces, sealed: sealed.size, open, change, gains };
+}
+const newCrackCount = day => (day >= 6 ? 3 : day >= 3 ? 2 : 1);  // その夜に開く裂け目の数
+function eta(plan) {
+  let depth = Math.min(DEPTH_CAP, S.depth + plan.change);
+  if (depth <= 0 || S.day >= MAX_DAYS) return { night: S.day };
+  let open = plan.open, day = S.day;
+  while (day < MAX_DAYS) {
+    open += newCrackCount(day);
+    day++;
+    depth -= RISE_BASE + RISE_PER_CRACK * open;
+    if (depth <= 0) return { night: day };
+  }
+  return { night: MAX_DAYS, cap: true };
+}
+function damageRange(extra = {}) {
+  const base = ROUNDS * S.dragons.reduce((a, d) => a + attackAt(d, d.xp + (extra[d.id] || 0)), 0);
+  return { min: Math.round(base), max: Math.round(base * CRIT_MULT) };
+}
+
+let busy = false;
+let shaftPhase = null;  // 光が走っている間は、その光の窓の光の筋だけを出す
+
+// ---- 描画 ----
+function render() {
+  const plan = busy ? null : dayPlan();
+  renderBoard(plan);
+  renderShafts(busy ? shaftPhase : null);
+  renderHud(plan);
+  updateTimer();
+  if (plan) {
+    beamsG.replaceChildren(...plan.traces.flatMap(t => t.paths.map(pts => polyline(pts, `beam preview ${t.light}`))));
+  }
+}
+
+function renderBoard(plan) {
+  const srcs = sources();
+  const moonToday = moonOf(S.day);
+  const tomorrow = S.day < MAX_DAYS ? moonOf(S.day + 1) : null;
+  const litSun = new Set(), litMoon = new Set();
+  if (plan) for (const t of plan.traces) for (const d of t.lit) (t.light === 'sun' ? litSun : litMoon).add(d.id);
+  const out = [];
+  // 城壁の光窓。光が入る窓だけが明るく、それ以外は暗い開口部
+  const edgeCell = (side, pos, gridPos) => {
+    const here = srcs.filter(s => s.side === side && s.pos === pos);
+    const cls = ['win'], icons = [];
+    for (const s of here) {
+      if (s.light === 'sun') {
+        cls.push(s.mult ? 'sun' : 'off');
+        icons.push(s.mult
+          ? `<span class="src sun" role="img" aria-label="${s.label}が差し込む窓">☀︎</span>`
+          : `<span class="src off" role="img" aria-label="${s.label}の窓（天気で出ない）">☁︎</span>`);
+      } else {
+        cls.push('moon');
+        if (moonToday.dim) cls.push('dim');
+        if (s.mult > 1) cls.push('strong');
+        icons.push(`<span class="src moon" role="img" aria-label="月（${moonToday.name}）が差し込む窓">${moonToday.glyph}</span>`);
+      }
+    }
+    if (here.length > 1) cls.push('two');
+    const next = tomorrow && tomorrow.side === side && tomorrow.pos === pos;
+    if (next) cls.push('next');
+    out.push(`<div class="edge ${side === 'S' ? 'h' : 'v'}" style="${gridPos}"><span class="${cls.join(' ')}"${next && !here.length ? ' role="img" aria-label="明日の月が差し込む窓"' : ''}>${icons.join('')}</span></div>`);
+  };
+  out.push(`<div class="edge north" style="grid-row:1;grid-column:2 / span ${SIZE}"></div>`);
+  for (const [row, col] of [[1, 1], [1, SIZE + 2], [SIZE + 2, 1], [SIZE + 2, SIZE + 2]]) out.push(`<div class="edge corner" style="grid-row:${row};grid-column:${col}"></div>`);
+  for (let i = 0; i < SIZE; i++) {
+    edgeCell('W', i, `grid-row:${i + 2};grid-column:1`);
+    edgeCell('E', i, `grid-row:${i + 2};grid-column:${SIZE + 2}`);
+    edgeCell('S', i, `grid-row:${SIZE + 2};grid-column:${i + 2}`);
+  }
+  for (let r = 0; r < SIZE; r++) {
+    for (let c = 0; c < SIZE; c++) {
+      const k = key(r, c);
+      const pos = `grid-row:${r + 2};grid-column:${c + 2}`;
+      const alt = (r + c) % 2 ? ' alt' : '';
+      const fixed = inner => out.push(`<div class="cell${alt}" style="${pos}">${inner}</div>`);
+      if (S.rocks.includes(k)) { fixed('<span class="rock" role="img" aria-label="岩"></span>'); continue; }
+      if (S.vines.some(v => v.includes(k))) { fixed('<span class="vine" role="img" aria-label="蔓"></span>'); continue; }
+      if (S.cracks.includes(k)) { fixed(`<span class="crack${S.newCracks.includes(k) ? ' new' : ''}" role="img" aria-label="影の裂け目"></span>`); continue; }
+      if (S.vanes[k]) { fixed(`<span class="mirror vane ${S.vanes[k] === '/' ? 'slash' : 'back'}"></span><span class="vane-pin" role="img" aria-label="風見鏡（毎晩向きが変わる）">↻</span>`); continue; }
+      if (S.prisms.includes(k)) { fixed('<span class="prism" role="img" aria-label="プリズム"></span>'); continue; }
+      const d = dragonAt(r, c);
+      if (d) {
+        const lit = (litSun.has(d.id) ? ' lit-sun' : '') + (litMoon.has(d.id) ? ' lit-moon' : '');
+        const lv = level(d.xp);
+        fixed(`<span class="token ${d.type}${lit}" role="img" aria-label="${d.name} レベル${lv}">${d.type === 'sun' ? '陽' : '月'}<span class="lv">${lv}</span></span>`);
+        continue;
+      }
+      if (S.eggs.some(e => e.k === k)) { fixed('<span class="egg" role="img" aria-label="竜の卵"></span>'); continue; }
+      if (S.vineNext.includes(k)) { fixed('<span class="sprout" role="img" aria-label="今夜、蔓が伸びてくる"></span>'); continue; }
+      const m = S.mirrors[k];
+      const label = `${r + 1}行${c + 1}列 ${m ? (m === '/' ? '鏡（／）' : '鏡（＼）') : '空き'}`;
+      out.push(`<button type="button" class="cell${alt}${m ? ' has' : ''}" style="${pos}" data-r="${r}" data-c="${c}" aria-label="${label}">${m ? `<span class="mirror ${m === '/' ? 'slash' : 'back'}"></span>` : ''}</button>`);
+    }
+  }
+  board.innerHTML = out.join('');
+  board.classList.toggle('placing', S.placing === 'egg');
+  if (S.newCracks.length) setTimeout(() => { S.newCracks = []; }, 700);
+}
+
+function renderHud(plan) {
+  const w = WEATHER[today().weather], m = moonOf(S.day);
+  const wx = x => `<b class="${x.note ? 'bad' : ''}">${x.name}${x.note ? `（${x.note}）` : ''}</b>`;
+  const tw = WEATHER[S.forecast[1].weather];
+  $('sky').innerHTML = `<span class="day">ステージ${S.stage}・${S.day}日目<small>/ 最長${MAX_DAYS}日</small></span>`
+    + `<span>今日 ${wx(w)}・月は<b class="${m.mult > 1 ? 'good' : ''}">${m.name}${m.mult > 1 ? '（月光×2）' : ''}</b>${S.incense ? '<b class="good">・香で×2</b>' : ''}</span>`
+    + (S.day < MAX_DAYS ? `<span>明日 ${wx(tw)}・${moonOf(S.day + 1).name}</span>` : '');
+
+  // 地底
+  $('depthText').textContent = `地下${Math.max(0, S.depth)}m`;
+  $('shadeIcon').style.top = `${10 + Math.max(0, Math.min(DEPTH_CAP, S.depth)) / DEPTH_CAP * 70}px`;
+  $('shadeIcon').classList.toggle('near', S.depth <= 25);
+  if (plan) {
+    const parts = [`基本−${RISE_BASE}`];
+    if (plan.open) parts.push(`裂け目${plan.open}つ −${plan.open * RISE_PER_CRACK}`);
+    if (plan.sealed) parts.push(`封印${plan.sealed}つ +${plan.sealed * SEAL_PUSH}`);
+    $('riseText').innerHTML = `今夜 <b>${plan.change > 0 ? '+' : plan.change < 0 ? '−' : '±'}${Math.abs(plan.change)}m</b>（${parts.join('・')}）`;
+    const e = eta(plan), et = $('etaText');
+    if (e.night === S.day) { et.textContent = '今夜、地上に出てくる'; et.className = 'under-meta eta bad'; }
+    else {
+      et.textContent = e.cap ? `このままだと${MAX_DAYS}日目の夜に現れる（最長）` : `このままだと${e.night}日目の夜に現れる`;
+      et.className = 'under-meta eta' + (e.night - S.day <= 1 ? ' warn' : '');
+    }
+  } else {
+    $('riseText').textContent = '光を浴びている…';
+  }
+
+  // 決戦の見込み
+  const hp = P().hp;
+  const extra = {};
+  if (plan) for (const d of S.dragons) extra[d.id] = plan.gains[d.id].sun + plan.gains[d.id].moon;
+  const now = damageRange(), after = damageRange(extra);
+  $('bossHp').textContent = hp;
+  const scaleMax = Math.max(hp * 1.6, after.max);
+  $('rangeSpan').style.left = after.min / scaleMax * 100 + '%';
+  $('rangeSpan').style.width = Math.max(1, (after.max - after.min) / scaleMax * 100) + '%';
+  $('rangeHp').style.left = hp / scaleMax * 100 + '%';
+  $('range').setAttribute('aria-label', `今日の光のあとの予想ダメージ ${after.min}〜${after.max}、影の竜の体力 ${hp}`);
+  $('oddsText').innerHTML = `決戦の予想ダメージ <b>${after.min}〜${after.max}</b>${after.min > now.min ? `（今日の光で+${after.min - now.min}）` : ''}　会心しだいで上がる`;
+  const v = $('verdict');
+  if (after.min >= hp) { v.textContent = '会心なしでも勝てる'; v.className = 'verdict good'; }
+  else if (after.max >= hp) { v.textContent = '会心しだい'; v.className = 'verdict warn'; }
+  else { v.textContent = `会心でも${hp - after.max}足りない`; v.className = 'verdict bad'; }
+
+  // 竜
+  const cards = S.dragons.map(d => {
+    const pct = (d.xp % XP_PER_LEVEL) / XP_PER_LEVEL * 100;
+    const g = plan ? plan.gains[d.id] : null;
+    return `<div class="dcard">
+      <span class="token ${d.type}" aria-hidden="true">${d.type === 'sun' ? '陽' : '月'}</span>
+      <div class="dinfo">
+        <div class="dname">${d.name}<small>${d.type === 'sun' ? '太陽' : '月'}好き</small></div>
+        <div class="dlv">Lv${level(d.xp)}<span class="xpbar"><i style="width:${pct}%"></i></span>攻${Math.round(attackAt(d))}</div>
+        <div class="dtoday">${g ? `今日 <span class="sun-t">☀︎+${g.sun}</span> <span class="moon-t">☾+${g.moon}</span>` : '光を浴びている…'}</div>
+      </div>
+    </div>`;
+  });
+  for (const e of S.eggs) cards.push(`<div class="dcard egg-card"><span class="egg" aria-hidden="true"></span><div class="dinfo"><div class="dname">竜の卵</div><div class="dtoday">明日の朝かえる</div></div></div>`);
+  $('dragons').innerHTML = cards.join('');
+
+  // 行商人
+  $('scales').textContent = S.scales;
+  $('mirrorCount').textContent = `${mirrorsUsed()}/${S.owned}`;
+  $('wares').innerHTML = S.wares.map((id, i) => {
+    const ware = WARES[id], sold = S.sold.includes(i);
+    const blocked = busy || sold || S.screen !== 'play' || S.placing || !canBuy(id);
+    return `<button type="button" class="ware${sold ? ' sold' : ''}" data-i="${i}"${blocked ? ' disabled' : ''}><b>${ware.name}</b><span>${sold ? '買った' : ware.text}</span><em>鱗${ware.price}</em></button>`;
+  }).join('');
+
+  $('goBtn').disabled = busy || S.screen !== 'play' || !!S.placing;
+  $('goBtn').textContent = S.day === MAX_DAYS ? 'この配置で最後の1日を進める' : 'この配置で1日を進める';
+  $('hint').innerHTML = S.placing === 'egg'
+    ? '卵を置くマスをタップしてください<button type="button" id="cancelEgg">やめる</button>'
+    : 'マスをタップで鏡。もう一度で向きを変え、3回目で外す';
+}
+
+function canBuy(id) {
+  if (id === 'mirror') return S.owned < MAX_MIRRORS;
+  if (id === 'egg') return S.dragons.length + S.eggs.length < MAX_DRAGONS;
+  if (id === 'incense') return !S.incense;
+  return true;
+}
+
+// ---- 持ち時間 ----
+function updateTimer() {
+  const total = P().time, left = S.timeLeft;
+  const el = $('timer');
+  el.classList.toggle('over', left < 0);
+  el.classList.toggle('low', left >= 0 && left < 10);
+  $('timerFill').style.width = Math.max(0, left) / total * 100 + '%';
+  if (left >= 0) {
+    const bonus = Math.floor(left / TIME_BONUS_STEP);
+    $('timerText').textContent = `持ち時間 ${Math.ceil(left)}秒${bonus ? `・今決めると鱗+${bonus}` : ''}`;
+  } else {
+    $('timerText').textContent = `時間切れ！1秒ごとに影が${P().overRise}m上がる`;
+  }
+}
+const timerRunning = () => S && S.screen === 'play' && !busy && !S.paused && $('intro').hidden && document.visibilityState === 'visible';
+let lastTick = 0;
+setInterval(() => {
+  const now = performance.now();
+  const dt = lastTick ? Math.min(1, (now - lastTick) / 1000) : 0;
+  lastTick = now;
+  if (!timerRunning()) return;
+  const before = S.timeLeft;
+  S.timeLeft -= dt;
+  S.records.time += dt;
+  if (S.timeLeft < 0) {
+    S.overAcc += before > 0 ? -S.timeLeft : dt;
+    let rose = 0;
+    while (S.overAcc >= 1) { S.overAcc -= 1; S.depth -= P().overRise; rose += P().overRise; }
+    if (rose) {
+      render();
+      if (S.depth <= 0) { S.depth = 0; startBattle(true); return; }
+    }
+  }
+  updateTimer();
+}, 200);
+
+const SVG_NS = 'http://www.w3.org/2000/svg';
+// 窓から庭へ広がる光の筋
+function renderShafts(only) {
+  const L = 1.6, h0 = .26, h1 = .48;
+  const shapes = [];
+  for (const s of sources()) {
+    if (!s.mult || (only && s.id !== only)) continue;
+    let pts;
+    if (s.side === 'E') { const x0 = EDGE + SIZE, y = TOP + s.pos + .5; pts = [[x0, y - h0], [x0 - L, y - h1], [x0 - L, y + h1], [x0, y + h0]]; }
+    else if (s.side === 'W') { const x0 = EDGE, y = TOP + s.pos + .5; pts = [[x0, y - h0], [x0 + L, y - h1], [x0 + L, y + h1], [x0, y + h0]]; }
+    else { const y0 = TOP + SIZE, x = EDGE + s.pos + .5; pts = [[x - h0, y0], [x - h1, y0 - L], [x + h1, y0 - L], [x + h0, y0]]; }
+    const p = document.createElementNS(SVG_NS, 'polygon');
+    p.setAttribute('points', pts.map(([x, y]) => `${x},${y}`).join(' '));
+    p.setAttribute('class', 'shaft');
+    p.setAttribute('fill', `url(#shaft-${s.light}-${s.side})`);
+    shapes.push(p);
+  }
+  $('shafts').replaceChildren(...shapes);
+}
+function polyline(pts, cls) {
+  const p = document.createElementNS(SVG_NS, 'polyline');
+  p.setAttribute('points', pts.map(([x, y]) => `${x},${y}`).join(' '));
+  p.setAttribute('class', cls);
+  return p;
+}
+
+function floatAt(r, c, text, cls, dy = 0) {
+  const f = document.createElement('div');
+  f.className = 'float ' + cls;
+  f.textContent = text;
+  const [x, y] = center(r, c);
+  f.style.left = x / W_UNITS * 100 + '%';
+  f.style.top = (y + dy) / H_UNITS * 100 + '%';
+  floats.append(f);
+  setTimeout(() => f.remove(), 1400);
+}
+
+let toastTimer;
+function toast(msg, ms = 2600) {
+  const t = $('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), ms);
+}
+
+const wait = ms => new Promise(res => setTimeout(res, reduceMotion ? Math.min(ms, 120) : ms));
+
+// ---- 操作 ----
+function onCell(r, c) {
+  if (busy || S.screen !== 'play') return;
+  const k = key(r, c), cur = S.mirrors[k];
+  if (S.placing === 'egg') {
+    if (occupied(r, c)) { toast('空いているマスを選んでください'); return; }
+    S.eggs.push({ k });
+    S.placing = null;
+    render();
+    toast('卵を置きました。明日の朝かえります');
+    return;
+  }
+  if (!cur) {
+    if (mirrorsUsed() >= S.owned) {
+      toast(S.owned >= MAX_MIRRORS ? '鏡はもう増やせません。置いた鏡を動かしてください' : '鏡が足りません。行商人から買えます');
+      return;
+    }
+    S.mirrors[k] = '/';
+  } else if (cur === '/') {
+    S.mirrors[k] = '\\';
+  } else {
+    delete S.mirrors[k];
+  }
+  render();
+}
+
+function buyWare(i) {
+  if (busy || S.screen !== 'play' || S.placing || S.sold.includes(i)) return;
+  const id = S.wares[i], ware = WARES[id];
+  if (!canBuy(id)) return;
+  if (S.scales < ware.price) { toast(`鱗があと${ware.price - S.scales}枚足りません`); return; }
+  S.scales -= ware.price;
+  S.sold.push(i);
+  if (id === 'mirror') { S.owned++; toast('鏡を1枚買いました'); }
+  if (id === 'egg') { S.placing = 'egg'; toast('卵を置くマスをタップしてください'); }
+  if (id === 'seal') { S.depth = Math.min(DEPTH_CAP, S.depth + SEAL_CHARM_PUSH); toast(`影の竜を${SEAL_CHARM_PUSH}m押し戻しました`); }
+  if (id === 'feast') {
+    for (const d of S.dragons) { d.xp += 2; floatAt(d.r, d.c, '+2', 'sun'); }
+    toast('竜たちがごちそうを平らげた');
+  }
+  if (id === 'incense') { S.incense = true; toast('今夜の月光が2倍になります'); }
+  render();
+}
+
+function cancelEgg() {
+  if (S.placing !== 'egg') return;
+  const i = S.wares.indexOf('egg');
+  S.sold = S.sold.filter(x => x !== i);
+  S.scales += WARES.egg.price;
+  S.placing = null;
+  render();
+}
+
+function fire(t) {
+  const lines = t.paths.map(pts => {
+    const p = polyline(pts, `beam fire ${t.light}`);
+    p.setAttribute('filter', 'url(#glow)');
+    beamsG.append(p);
+    return { p, pts };
+  });
+  if (reduceMotion) return wait(150);
+  let longest = 0;
+  for (const { p, pts } of lines) {
+    let len = 0;
+    for (let i = 1; i < pts.length; i++) len += Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]);
+    longest = Math.max(longest, len);
+    p.style.strokeDasharray = len;
+    p.style.strokeDashoffset = len;
+    p.dataset.len = len;
+  }
+  const dur = Math.min(1000, 250 + longest * 80);
+  beamsG.getBoundingClientRect();
+  for (const { p } of lines) {
+    p.style.transition = `stroke-dashoffset ${dur}ms linear`;
+    p.style.strokeDashoffset = 0;
+  }
+  return wait(dur);
+}
+
+// 光を当てた結果を反映する
+function applyLight(t) {
+  let scales = 0;
+  t.lit.forEach((d, i) => {
+    const before = level(d.xp), g = t.gains[d.id];
+    d.xp += g;
+    S.scales += 1;
+    scales += 1;
+    setTimeout(() => {
+      floatAt(d.r, d.c, `${t.light === 'sun' ? '☀︎' : '☾'}+${g}`, t.light);
+      if (level(d.xp) > before) floatAt(d.r, d.c, 'Lv UP', 'lvup', -.55);
+    }, i * 120);
+  });
+  for (const k of t.seals) {
+    if (!S.cracks.includes(k)) continue;
+    S.cracks = S.cracks.filter(x => x !== k);
+    S.sealedTotal++;
+    const [r, c] = unkey(k);
+    floatAt(r, c, '封印', 'shade');
+  }
+  return scales;
+}
+
+async function advance() {
+  if (busy || S.screen !== 'play' || S.placing) return;
+  busy = true;
+  S.newCracks = [];
+  const bonus = Math.floor(Math.max(0, S.timeLeft) / TIME_BONUS_STEP);
+  S.scales += bonus;
+  // その日の光の道は朝の盤面で決まる（予告どおりになるよう、途中で封じた裂け目で道は変えない）
+  const plan = dayPlan();
+  render();
+  beamsG.replaceChildren();
+  const wrap = $('boardWrap');
+  let got = 0;
+  for (const t of plan.traces) {
+    if (t.light === 'moon') {
+      wrap.dataset.phase = '';
+      document.body.classList.add('night');
+      await wait(450);
+    } else {
+      wrap.dataset.phase = t.id;
+    }
+    shaftPhase = t.id;
+    renderShafts(t.id);
+    if (!t.paths.length) {
+      toast(`${t.label}は出ない…`, 1100);
+      await wait(700);
+      continue;
+    }
+    await fire(t);
+    got += applyLight(t);
+    render();
+    await wait(t.light === 'moon' ? 800 : 450);
+    beamsG.replaceChildren();
+  }
+  // 夜明け前: 影の竜が上がってくる
+  shaftPhase = 'none';
+  S.depth = Math.min(DEPTH_CAP, S.depth + plan.change);
+  wrap.classList.remove('quake');
+  void wrap.offsetWidth;
+  wrap.classList.add('quake');
+  render();
+  await wait(850);
+  if (S.depth <= 0 || S.day >= MAX_DAYS) {
+    busy = false;
+    startBattle(false);
+    return;
+  }
+  // 夜のうちに庭が変わる: 蔓が伸び、風見鏡が回り、裂け目が開く
+  for (let i = 0; i < S.vines.length; i++) {
+    const [r, c] = unkey(S.vines[i][S.vines[i].length - 1]);
+    const n = S.vineNext.find(k => { const [nr, nc] = unkey(k); return Math.abs(nr - r) + Math.abs(nc - c) === 1; });
+    if (n) { S.vines[i].push(n); S.vineNext = S.vineNext.filter(x => x !== n); const [nr, nc] = unkey(n); floatAt(nr, nc, '蔓が伸びた', 'leaf'); }
+  }
+  S.vineNext = [];
+  for (const k of Object.keys(S.vanes)) S.vanes[k] = S.vanes[k] === '/' ? '\\' : '/';
+  for (let i = 0; i < newCrackCount(S.day); i++) {
+    const k = randomEmpty();
+    if (k) { S.cracks.push(k); S.newCracks.push(k); }
+  }
+  startMorning();
+  wrap.dataset.phase = '';
+  document.body.classList.remove('night');
+  busy = false;
+  render();
+  const notes = [];
+  if (S.lastHatch) notes.push(`${S.lastHatch}がかえった`);
+  notes.push(`鱗を${got + bonus}枚${bonus ? `（早決め+${bonus}）` : ''}`);
+  notes.push(`裂け目が${S.newCracks.length}つ開いた`);
+  toast(`${S.day}日目の朝。${notes.join('。')}`, 3400);
+}
+
+function startMorning() {
+  S.day++;
+  S.forecast = [S.forecast[1], { weather: pickWeather() }];
+  S.incense = false;
+  S.lastHatch = '';
+  hatchEggs();
+  computeVineNext();
+  rollWares();
+  S.timeLeft = P().time;
+  S.overAcc = 0;
+}
+function hatchEggs() {
+  for (const e of S.eggs) {
+    const [r, c] = unkey(e.k);
+    const type = rand() < .5 ? 'sun' : 'moon';
+    const names = HATCH_NAMES[type];
+    const name = names[S.hatched % names.length];
+    S.hatched++;
+    S.dragons.push({ id: 'd' + S.hatched, name, type, r, c, xp: 0 });
+    S.lastHatch = S.lastHatch ? S.lastHatch + '・' + name : name;
+  }
+  S.eggs = [];
+}
+
+// ---- ステージ ----
+function showStageCard() {
+  const p = P(), g = GIMMICKS[S.stage];
+  $('stageEyebrow').textContent = `ステージ${S.stage}`;
+  $('stageTitle').textContent = g ? `新しい仕掛け：${g.name}` : S.stage === 1 ? '最初の庭' : '新しい庭';
+  $('stageNew').hidden = !g;
+  if (g) $('stageNew').innerHTML = `<b>${g.name}</b>　${g.text}`;
+  $('stageFacts').innerHTML = `
+    <dt>影の竜の体力</dt><dd>${p.hp}</dd>
+    <dt>毎朝の持ち時間</dt><dd>${p.time}秒（過ぎると1秒ごとに${p.overRise}m上がる）</dd>
+    <dt>連れていく竜</dt><dd>${S.dragons.map(d => `${d.name} Lv${level(d.xp)}`).join('・')}</dd>`;
+  $('stageCard').hidden = false;
+}
+
+// ---- 決戦 ----
+let battleRun = 0;
+async function startBattle(byTime) {
+  const run = ++battleRun;
+  busy = false;
+  S.screen = 'battle';
+  document.body.classList.add('night');
+  render();
+  $('intro').hidden = true;
+  $('battle').hidden = false;
+  $('result').hidden = true;
+  $('log').innerHTML = '';
+  const hpMax = P().hp;
+  $('bossHpMax').textContent = hpMax;
+  $('battleEyebrow').textContent = byTime ? `ステージ${S.stage}・${S.day}日目・持ち時間を使い果たした` : S.depth <= 0 ? `ステージ${S.stage}・${S.day}日目の夜` : `ステージ${S.stage}・${S.day}日目の夜・猶予が尽きた`;
+  const range = damageRange();
+  $('battleSum').textContent = S.dragons.map(d => `${d.name} Lv${level(d.xp)}`).join('・') + `　予想 ${range.min}〜${range.max}`;
+  const big = $('bossBig');
+  big.classList.remove('rise', 'hit');
+  void big.offsetWidth;
+  big.classList.add('rise');
+  let hp = hpMax;
+  setBossHp(hp, hpMax);
+  await wait(1500);
+  outer:
+  for (let round = 1; round <= ROUNDS; round++) {
+    if (run !== battleRun) return;
+    addLog(`${round}ラウンド目`, 'round');
+    for (const d of S.dragons) {
+      await wait(400);
+      if (run !== battleRun) return;
+      const crit = Math.random() < CRIT_RATE;
+      const dmg = Math.round(attackAt(d) * (crit ? CRIT_MULT : 1));
+      hp = Math.max(0, hp - dmg);
+      const tags = [d.type === BOSS_WEAK ? '弱点' : '', crit ? '会心！' : ''].filter(Boolean).join('・');
+      addLog(`${d.name}のブレス！ ${dmg}ダメージ${tags ? `（${tags}）` : ''}`, d.type + (crit ? ' crit' : ''));
+      setBossHp(hp, hpMax);
+      big.classList.remove('rise', 'hit');
+      void big.offsetWidth;
+      big.classList.add('hit');
+      if (hp === 0) break outer;
+    }
+    if (round < ROUNDS) { await wait(450); addLog(`影の竜が咆哮した……（残り${hp}）`, 'shade'); }
+  }
+  await wait(700);
+  if (run !== battleRun) return;
+  S.screen = 'end';
+  const win = hp === 0;
+  S.lastWin = win;
+  if (win) S.records.cleared = Math.max(S.records.cleared, S.stage);
+  const title = $('resultTitle');
+  title.textContent = win ? `ステージ${S.stage} クリア` : '王国は夜に包まれた';
+  title.className = win ? 'win' : 'lose';
+  $('resultText').textContent = win
+    ? `影の竜は光の中に崩れて消えた。けれど地の底では、もっと大きな影がうごめいている。竜たちは育ったまま次の庭へ向かう。`
+    : `影の竜は残り体力${hp}で踏みとどまった。竜たちはステージ${S.stage}を始めたときの姿に戻り、もう一度挑む。`;
+  const t = Math.round(S.records.time);
+  $('recordText').textContent = `クリアしたステージ ${S.records.cleared}・ここまでの合計タイム ${Math.floor(t / 60)}分${String(t % 60).padStart(2, '0')}秒`;
+  $('nextBtn').textContent = win ? `ステージ${S.stage + 1}へ` : `ステージ${S.stage}をやり直す`;
+  $('result').hidden = false;
+  $('nextBtn').focus();
+}
+function setBossHp(hp, max) {
+  $('bossBar').style.width = hp / max * 100 + '%';
+  $('bossHpNow').textContent = hp;
+}
+function addLog(text, cls) {
+  const li = document.createElement('li');
+  li.className = cls;
+  li.textContent = text;
+  $('log').append(li);
+  li.scrollIntoView({ block: 'nearest', behavior: reduceMotion ? 'auto' : 'smooth' });
+}
+
+function afterBattle() {
+  battleRun++;
+  if (S.lastWin) {
+    hatchEggs();
+    S.stage++;
+    startStage((S.stageSeed * 1664525 + 1013904223) >>> 0);
+  } else {
+    S.dragons = clone(S.teamAtStart);
+    startStage(S.stageSeed);
+  }
+  $('battle').hidden = true;
+  document.body.classList.remove('night');
+  render();
+  showStageCard();
+}
+function restartRun() {
+  battleRun++;
+  newRun(Date.now());
+  S.screen = 'stage';
+  $('battle').hidden = true;
+  document.body.classList.remove('night');
+  render();
+  showStageCard();
+}
+
+function setPaused(on) {
+  if (on && S.screen !== 'play') return;
+  S.paused = on;
+  $('pause').hidden = !on;
+}
+
+// ---- 起動 ----
+let S;
+function start(data) {
+  if (data && data.S && typeof data.S.stage === 'number') S = data.S;
+  else newRun(Date.now());
+  busy = false;
+  board.addEventListener('click', e => {
+    const b = e.target.closest('button[data-r]');
+    if (b) onCell(+b.dataset.r, +b.dataset.c);
+  });
+  $('wares').addEventListener('click', e => {
+    const b = e.target.closest('button[data-i]');
+    if (b) buyWare(+b.dataset.i);
+  });
+  $('hint').addEventListener('click', e => { if (e.target.id === 'cancelEgg') cancelEgg(); });
+  $('goBtn').addEventListener('click', advance);
+  $('nextBtn').addEventListener('click', afterBattle);
+  $('restartBtn').addEventListener('click', restartRun);
+  $('pauseBtn').addEventListener('click', () => setPaused(true));
+  $('resumeBtn').addEventListener('click', () => setPaused(false));
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') setPaused(true); });
+  $('helpBtn').addEventListener('click', () => {
+    if (busy || S.screen === 'battle' || S.screen === 'end') return;
+    $('startBtn').textContent = S.screen === 'intro' ? '庭へ出る' : '続ける';
+    $('intro').hidden = false;
+  });
+  $('startBtn').addEventListener('click', () => {
+    $('intro').hidden = true;
+    if (S.screen === 'intro') { S.screen = 'stage'; showStageCard(); }
+  });
+  $('stageStartBtn').addEventListener('click', () => {
+    $('stageCard').hidden = true;
+    S.screen = 'play';
+    render();
+    if (S.stage === 1 && S.day === 1) toast('朝・昼・夕・夜の4本の光を、1つの鏡の配置でさばこう', 3200);
+  });
+  $('intro').hidden = S.screen !== 'intro';
+  $('stageCard').hidden = true;
+  $('pause').hidden = !S.paused;
+  render();
+  if (S.screen === 'stage') showStageCard();
+  if (S.screen === 'battle' || S.screen === 'end') startBattle(false);
+}
+window.claude?.hot?.snapshot?.(() => ({ S: JSON.parse(JSON.stringify(S)) }));
+window.claude?.hot?.ready ? window.claude.hot.ready(start) : start(window.claude?.hot?.data ?? {});
+</script>
