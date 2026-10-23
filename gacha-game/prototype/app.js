@@ -297,6 +297,7 @@
   function setView(view) {
     ui.view = view;
     saveUI();
+    document.body.dataset.view = view; // 結果ページでは CSS で枠の表示とタブを隠す
     const tabView = view === "result" ? "draw" : view; // 結果ページはくじのタブの中の1ページ
     for (const tab of document.querySelectorAll("[data-view]")) tab.setAttribute("aria-selected", String(tab.dataset.view === tabView));
     for (const v of VIEWS) $(`view-${v}`).hidden = v !== view;
