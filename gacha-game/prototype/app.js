@@ -12,6 +12,7 @@
   const ATTR_CLASS = { 水: "water", 火: "fire", 土: "earth", 雷: "thunder", 光: "light", 闇: "dark" };
   const FRAME_CLASS = { 素: "plain", 銅: "copper", 銀: "silver", 金: "gold", 虹: "rainbow", 神: "divine" };
   const FRAME_STEPS = [5, 10, 20, 50, 100];
+  const VIEWS = ["draw", "result", "book", "shelf", "test"];
   const reduceMotion = !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
 
   let state;
@@ -163,6 +164,16 @@
     $("buy-reifu").disabled = !canReifu;
     $("buy-reifu-s").textContent = canReifu ? "購入から6か月で失効" : `所持上限の${fmt(S.REIFU_CAP)}枚に達しています`;
     $("yen").textContent = `¥${fmt(state.stats.yen)}`;
+
+    // 結果ページの「もう一度引く」は、前回と同じ単位・同じ引き方で引く
+    const last = state.lastResult;
+    $("last-link").hidden = !last;
+    if (last) {
+      const again = $("again");
+      const short = S.available(state, last.source) < last.unit;
+      again.disabled = busy || short || (last.unit === 10 && Date.now() < tenReadyAt);
+      again.textContent = short ? `${last.source === "reifu" ? "霊符" : "枠"}が足りません` : `もう一度 ${last.unit}連`;
+    }
   }
 
   function renderOdds() {
@@ -193,7 +204,8 @@
     if (res.pityHit) groups.push(`<p class="note">天井に届いたので、★5が確定しました。</p>`);
     const high = Object.keys(res.high).sort((a, b) => cards.byId[b].rarity - cards.byId[a].rarity);
     if (high.length) {
-      groups.push(`<div class="group"><h3>★4以上</h3><div class="chips">${high.map((id) => chipHTML(id, `×${res.high[id]}`)).join("")}</div></div>`);
+      const tiles = high.map((id) => `<div class="tile">${cardHTML(cards.byId[id])}${res.high[id] > 1 ? `<span class="badge">×${res.high[id]}</span>` : ""}</div>`);
+      groups.push(`<div class="group"><h3>★4以上<small>${high.length}種</small></h3><div class="tiles">${tiles.join("")}</div></div>`);
     }
     if (res.newIds.length) {
       groups.push(`<div class="group"><h3>新しく手に入れた<small>${res.newIds.length}種</small></h3><div class="chips">${res.newIds.map((id) => chipHTML(id)).join("")}</div></div>`);
@@ -285,8 +297,9 @@
   function setView(view) {
     ui.view = view;
     saveUI();
-    for (const tab of document.querySelectorAll("[data-view]")) tab.setAttribute("aria-selected", String(tab.dataset.view === view));
-    for (const v of ["draw", "book", "shelf", "test"]) $(`view-${v}`).hidden = v !== view;
+    const tabView = view === "result" ? "draw" : view; // 結果ページはくじのタブの中の1ページ
+    for (const tab of document.querySelectorAll("[data-view]")) tab.setAttribute("aria-selected", String(tab.dataset.view === tabView));
+    for (const v of VIEWS) $(`view-${v}`).hidden = v !== view;
     renderAll();
     window.scrollTo(0, 0);
   }
@@ -513,12 +526,13 @@
 
   // ------------------------------------------------------------ 操作
 
-  async function onDraw(unit) {
+  async function onDraw(unit, source) {
+    source = source || ui.source;
     if (busy) return;
     if (unit === 10 && Date.now() < tenReadyAt) return;
-    const res = S.draw(state, cards, unit, ui.source, now());
+    const res = S.draw(state, cards, unit, source, now());
     if (!res) {
-      toast(ui.source === "reifu" ? "霊符が足りません" : "枠が足りません");
+      toast(source === "reifu" ? "霊符が足りません" : "枠が足りません");
       return;
     }
     save();
@@ -537,8 +551,7 @@
     renderDrawControls();
     await playShow(res);
     busy = false;
-    renderAll();
-    if (unit !== 10) $("result").scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "start" });
+    setView("result");
   }
 
   function skipTime(ms) {
@@ -616,6 +629,12 @@
       save();
       renderAll();
     });
+    $("again").addEventListener("click", () => {
+      const last = state.lastResult;
+      if (last) onDraw(last.unit, last.source);
+    });
+    $("back").addEventListener("click", () => setView("draw"));
+    $("last-link").addEventListener("click", () => setView("result"));
     $("sim7").addEventListener("click", () => simulate(7));
     $("sim30").addEventListener("click", () => simulate(30));
     $("reset").addEventListener("click", () => {
@@ -632,7 +651,7 @@
       $("reset").hidden = false;
       $("reset-confirm").hidden = true;
       $("sim-result").textContent = "";
-      renderAll();
+      setView(ui.view === "result" ? "draw" : ui.view);
       toast("データを消しました");
     });
   }
@@ -640,7 +659,7 @@
   function start(data) {
     state = data && data.state ? data.state : S.restore(readJSON(STORE_KEY), Date.now());
     Object.assign(ui, readJSON(UI_KEY) || {}, data && data.ui ? data.ui : {});
-    if (!["draw", "book", "shelf", "test"].includes(ui.view)) ui.view = "draw";
+    if (!VIEWS.includes(ui.view) || (ui.view === "result" && !state.lastResult)) ui.view = "draw";
     if (ui.source !== "reifu") ui.source = "waku";
     renderOdds();
     bind();

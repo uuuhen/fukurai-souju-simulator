@@ -198,6 +198,21 @@ thead th { color: var(--muted); font-weight: 500; }
 .g-val b { color: var(--gold); }
 @keyframes grow { from { transform: scaleX(0); } to { transform: scaleX(1); } }
 .empty { color: var(--muted); font-size: 13.5px; margin: 0; }
+.tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 10px; }
+.tile { position: relative; min-width: 0; }
+.tile .badge {
+  position: absolute; right: -4px; top: -6px; z-index: 3; padding: 0 7px; border-radius: 999px;
+  background: var(--ink); color: var(--bg); font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums;
+}
+.result-actions {
+  position: sticky; z-index: 4; bottom: calc(var(--tab-h) + 8px + env(safe-area-inset-bottom, 0px));
+  display: grid; grid-template-columns: 2fr 1fr; gap: 8px;
+  padding: 8px; border-radius: var(--radius); background: var(--surface); border: 1px solid var(--line);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+}
+.result-actions .btn { padding-block: 11px; font-size: 15px; }
+.result-actions .btn:disabled { opacity: 0.5; cursor: default; }
+#last-link { justify-self: start; }
 
 /* ------------------------------------------------------------ カード(御札) */
 .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 10px; }
@@ -444,7 +459,15 @@ div.card { cursor: default; }
         <p class="note">試作なので、実際の支払いは起きません。押した金額は「仮の支払い」として記録します（<span id="yen" class="num">¥0</span>）。</p>
       </div>
 
+      <button type="button" class="btn" id="last-link" hidden>前回の結果を見る</button>
+    </section>
+
+    <section class="view" id="view-result" aria-label="くじの結果" hidden>
       <div class="panel" id="result" aria-live="polite"></div>
+      <div class="result-actions">
+        <button type="button" class="btn primary" id="again">もう一度引く</button>
+        <button type="button" class="btn" id="back">くじに戻る</button>
+      </div>
     </section>
 
     <section class="view" id="view-book" aria-labelledby="book-title" hidden>
