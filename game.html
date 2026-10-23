@@ -4,7 +4,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Kaisei+Decol:wght@700&family=Zen+Maru+Gothic:wght@500;700&display=swap">
 <style>
-/* Layout: 1画面のボードゲーム。上に影の竜までのカウントダウン、中央に7×7の庭、下に竜2頭と「1日を進める」。昼と夜でページ全体の色が変わる */
+/* Layout: 1画面のボードゲーム。上に天気、中央に7×7の庭、その真下に地底（影の竜）、下に竜・行商人・「1日を進める」。昼と夜でページ全体の色が変わる */
 :root {
   color-scheme: dark;
   --ground: #1f3628;        /* 昼: 王宮の生け垣 */
@@ -16,11 +16,13 @@
   --soil: #6b4c31;
   --soil-alt: #634529;
   --soil-edge: #3e2a19;
+  --deep: #1b120c;
   --sun: #ffb22e;
   --moon: #b8dbff;
   --shade: #1a0f26;
   --shade-glow: #b06cff;
   --good: #8fd694;
+  --warn: #ffd166;
   --bad: #ff9a8a;
   --font-display: "Kaisei Decol", "Hiragino Mincho ProN", "Yu Mincho", serif;
   --font-ui: "Zen Maru Gothic", "Hiragino Maru Gothic ProN", "Hiragino Sans", "Noto Sans JP", system-ui, sans-serif;
@@ -44,13 +46,13 @@ button:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
   margin: 0 auto;
   padding-left: max(16px, env(safe-area-inset-left, 0px));
   padding-right: max(16px, env(safe-area-inset-right, 0px));
-  padding-block: 10px 18px;
+  padding-block: 10px 0;
   display: flex;
   flex-direction: column;
   gap: 10px;
 }
 
-/* ヘッダー */
+/* ヘッダーと天気 */
 .top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 h1 { font-family: var(--font-display); font-size: 22px; margin: 0; letter-spacing: .06em; }
 .ghost {
@@ -58,42 +60,18 @@ h1 { font-family: var(--font-display); font-size: 22px; margin: 0; letter-spacin
   border: 1px solid var(--line); border-radius: 999px;
   padding: 5px 12px; font-size: 13px; cursor: pointer;
 }
-
-/* 影の竜パネル */
-.boss-panel {
-  background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
-  padding: 10px 12px; display: grid; gap: 6px;
-}
-.days { display: flex; gap: 4px; list-style: none; margin: 0; padding: 0; }
-.days li {
-  flex: 1; text-align: center; font-size: 12px; padding: 2px 0; border-radius: 6px;
-  background: rgba(241, 230, 204, .06); color: var(--text-dim); font-variant-numeric: tabular-nums;
-}
-.days li.done { background: rgba(255, 178, 46, .18); color: var(--text); }
-.days li.now { background: var(--sun); color: #2a1a06; font-weight: 700; }
-.days li.wake { background: var(--shade); color: var(--shade-glow); font-family: var(--font-display); }
-.boss-line { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
-.boss-line strong { font-family: var(--font-display); font-size: 17px; color: #e2c9ff; letter-spacing: .04em; }
-.boss-line span { font-size: 13px; }
-.boss-meta { font-size: 12.5px; color: var(--text-dim); }
-.boss-meta b { color: var(--text); font-variant-numeric: tabular-nums; }
-.gauge { position: relative; height: 10px; border-radius: 999px; background: rgba(0, 0, 0, .35); overflow: hidden; }
-.gauge i { position: absolute; inset: 0 auto 0 0; border-radius: inherit; transition: width .4s ease; }
-.gauge .ghost-fill { background: rgba(255, 178, 46, .35); }
-.gauge .fill { background: linear-gradient(90deg, var(--sun), #ffd27a); }
-.gauge-label { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; font-size: 12.5px; font-variant-numeric: tabular-nums; }
-.gauge-label b { font-size: 14px; }
-.gauge-label .plus { color: var(--sun); margin-left: 4px; }
-.verdict.good { color: var(--good); }
-.verdict.bad { color: var(--bad); }
-.sun-t { color: var(--sun); }
-.moon-t { color: var(--moon); }
+.sky { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; font-size: 13px; color: var(--text-dim); }
+.sky .day { font-family: var(--font-display); font-size: 20px; color: var(--text); }
+.sky .day small { font-family: var(--font-ui); font-size: 12px; color: var(--text-dim); margin-left: 2px; }
+.sky .wx { color: var(--text); font-weight: 700; }
+.sky .wx.bad { color: var(--bad); }
+.sky .wx.good { color: var(--warn); }
 
 /* 庭 */
 .board-wrap {
   position: relative;
-  width: min(100%, 56vh);
-  width: min(100%, 56svh);
+  width: min(100%, 50vh);
+  width: min(100%, 50svh);
   aspect-ratio: 1;
   margin: 0 auto;
   container-type: inline-size;
@@ -113,6 +91,14 @@ h1 { font-family: var(--font-display); font-size: 22px; margin: 0; letter-spacin
 }
 .src.sun { background: radial-gradient(circle, #ffe08a, var(--sun)); color: #4a2a00; box-shadow: 0 0 12px var(--sun); }
 .src.moon { background: radial-gradient(circle, #f4fbff, var(--moon)); color: #1d2d4a; box-shadow: 0 0 12px var(--moon); }
+.src.strong { box-shadow: 0 0 0 2px #fff, 0 0 18px 4px currentColor; }
+.src.off { background: #3b3f45; color: #9aa0a8; box-shadow: none; }
+.next {
+  width: 12px; height: 12px; width: calc(100cqw * .036); height: calc(100cqw * .036);
+  border-radius: 50%; border: 1.5px dashed currentColor; opacity: .75;
+}
+.next.sun { color: var(--sun); }
+.next.moon { color: var(--moon); }
 .cell {
   position: relative; border: 0; padding: 0; margin: 0;
   background: var(--soil); box-shadow: inset 0 0 0 .5px var(--soil-edge);
@@ -122,6 +108,7 @@ h1 { font-family: var(--font-display); font-size: 22px; margin: 0; letter-spacin
 button.cell { cursor: pointer; -webkit-tap-highlight-color: transparent; }
 button.cell:active { filter: brightness(1.18); }
 button.cell:focus-visible { outline: 2px solid var(--text); outline-offset: -2px; z-index: 1; }
+.placing button.cell:not(.has) { box-shadow: inset 0 0 0 1.5px rgba(255, 210, 122, .55); }
 .frame {
   position: absolute; z-index: 1; pointer-events: none;
   left: calc(100% * .6 / 7.6); top: calc(100% * .6 / 7.6); right: 0; bottom: 0;
@@ -134,12 +121,29 @@ button.cell:focus-visible { outline: 2px solid var(--text); outline-offset: -2px
 .veil.sunv { background: radial-gradient(circle at 0% 50%, rgba(255, 190, 80, .3), transparent 70%); }
 .veil.nightv { background: rgba(16, 24, 70, .55); }
 body.sunlit .veil.sunv, body.night .veil.nightv { opacity: 1; }
+.quake { animation: quake .5s ease; }
+@keyframes quake { 20% { transform: translate(-3px, 1px); } 40% { transform: translate(3px, -1px); } 60% { transform: translate(-2px, 1px); } 80% { transform: translate(1px, 0); } }
 
 .rock {
   width: 70%; height: 62%;
   border-radius: 46% 54% 40% 60% / 55% 45% 55% 45%;
   background: radial-gradient(circle at 35% 30%, #a59a8a, #5d554b 75%);
   box-shadow: 0 3px 4px rgba(0, 0, 0, .45);
+}
+.crack {
+  position: absolute; inset: 14%;
+  border-radius: 40% 60% 55% 45% / 50% 40% 60% 50%;
+  background: radial-gradient(circle at 50% 55%, #c38bff 0, #4b1f7a 30%, #120818 70%);
+  box-shadow: 0 0 10px rgba(176, 108, 255, .7);
+  animation: seep 2.2s ease-in-out infinite;
+}
+.crack.new { animation: open .6s ease-out, seep 2.2s ease-in-out .6s infinite; }
+@keyframes seep { 50% { box-shadow: 0 0 16px 3px rgba(176, 108, 255, .85); } }
+@keyframes open { from { transform: scale(.2); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+.egg {
+  width: 46%; height: 58%; border-radius: 50% 50% 46% 46% / 60% 60% 40% 40%;
+  background: radial-gradient(circle at 35% 30%, #fffaf0, #d8c7a4 75%);
+  box-shadow: 0 3px 5px rgba(0, 0, 0, .4);
 }
 .mirror {
   position: absolute; left: 2%; top: 44%; width: 96%; height: 12%; border-radius: 2px;
@@ -167,26 +171,6 @@ body.sunlit .veil.sunv, body.night .veil.nightv { opacity: 1; }
   font-variant-numeric: tabular-nums;
 }
 
-.boss {
-  position: relative; overflow: hidden; display: grid; place-items: center;
-  background: radial-gradient(circle at 50% 60%, #3a1f55, var(--shade) 70%);
-  box-shadow: inset 0 0 0 .5px var(--soil-edge), inset 0 0 calc(100cqw * .05) rgba(176, 108, 255, .35);
-}
-.boss .kanji { font-family: var(--font-display); font-size: calc(100cqw * .12); color: rgba(176, 108, 255, .22); }
-.boss .eyes { position: absolute; top: 36%; left: 0; right: 0; display: flex; justify-content: center; gap: calc(100cqw * .05); }
-.boss .eyes i {
-  width: calc(100cqw * .035); height: calc(100cqw * .022); border-radius: 50%;
-  background: var(--shade-glow); box-shadow: 0 0 8px var(--shade-glow);
-  transform: scaleY(var(--open, .12));
-}
-.boss .zzz { position: absolute; right: 14%; top: 8%; font-size: calc(100cqw * .03); color: #cfa6ff; animation: zzz 2.4s ease-in-out infinite; }
-.boss.stir .zzz { display: none; }
-.boss.stir .eyes i { animation: pulse 1.2s ease-in-out infinite; }
-.boss.absorb { animation: absorb .8s ease-out; }
-@keyframes zzz { 0% { opacity: 0; transform: translate(0, 4px); } 40% { opacity: .9; } 100% { opacity: 0; transform: translate(6px, -10px); } }
-@keyframes pulse { 50% { box-shadow: 0 0 16px 4px var(--shade-glow); } }
-@keyframes absorb { 30% { filter: brightness(2); } }
-
 svg.beams { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 3; pointer-events: none; overflow: visible; }
 .beam { fill: none; stroke-linecap: round; stroke-linejoin: round; }
 .beam.sun { stroke: var(--sun); }
@@ -206,30 +190,95 @@ svg.beams { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 3;
 .float.shade { color: #d9b8ff; font-size: calc(100cqw * .034); }
 @keyframes floatUp { 0% { opacity: 0; transform: translate(-50%, -30%); } 15% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%, -170%); } }
 
+/* 地底 */
+.under {
+  display: grid; grid-template-columns: 64px 1fr; gap: 10px;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 8px;
+}
+.strata {
+  position: relative; height: 92px; border-radius: 8px; overflow: hidden;
+  background: repeating-linear-gradient(180deg, #3d2a1b 0 9px, #33231a 9px 18px, #2a1d16 18px 27px);
+}
+.strata::before { content: ""; position: absolute; inset: 0 0 auto; height: 4px; background: #6b8f4e; }
+.strata .depthmark { position: absolute; left: 3px; font-size: 9px; color: rgba(241, 230, 204, .45); font-variant-numeric: tabular-nums; }
+.shade-icon {
+  position: absolute; left: 50%; width: 44px; height: 26px; border-radius: 50% 50% 40% 40%;
+  background: radial-gradient(circle at 50% 60%, #4a2870, var(--shade) 75%);
+  box-shadow: 0 0 12px rgba(176, 108, 255, .55);
+  transform: translate(-50%, -50%);
+  transition: top .9s cubic-bezier(.3, .7, .3, 1);
+  display: flex; justify-content: center; align-items: center; gap: 9px;
+}
+.shade-icon i { width: 7px; height: 4px; border-radius: 50%; background: var(--shade-glow); box-shadow: 0 0 6px var(--shade-glow); }
+.shade-icon.near i { animation: pulse 1.1s ease-in-out infinite; }
+@keyframes pulse { 50% { box-shadow: 0 0 12px 3px var(--shade-glow); } }
+.under-info { min-width: 0; display: grid; gap: 2px; align-content: center; }
+.under-line { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.under-line strong { font-family: var(--font-display); font-size: 16px; color: #e2c9ff; letter-spacing: .04em; }
+.under-line span { font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.under-meta { font-size: 12px; color: var(--text-dim); font-variant-numeric: tabular-nums; }
+.under-meta b { color: var(--text); }
+.eta.bad { color: var(--bad); font-weight: 700; }
+.eta.warn { color: var(--warn); }
+
+/* 決戦の見込み */
+.odds {
+  background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 8px 12px;
+  display: grid; gap: 5px;
+}
+.odds-line { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; font-size: 12.5px; font-variant-numeric: tabular-nums; }
+.odds-line b { font-size: 14px; }
+.verdict.good { color: var(--good); font-weight: 700; }
+.verdict.warn { color: var(--warn); font-weight: 700; }
+.verdict.bad { color: var(--bad); font-weight: 700; }
+.range { position: relative; height: 10px; border-radius: 999px; background: rgba(0, 0, 0, .35); overflow: hidden; }
+.range i { position: absolute; top: 0; bottom: 0; border-radius: 999px; transition: left .4s ease, width .4s ease; }
+.range .span { background: linear-gradient(90deg, var(--sun), #ffe1a0); opacity: .85; }
+.range .hp { width: 2px; background: #e2c9ff; box-shadow: 0 0 6px var(--shade-glow); border-radius: 0; }
+.sun-t { color: var(--sun); }
+.moon-t { color: var(--moon); }
+
 /* 竜のカード */
 .dragons { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .dcard {
   display: flex; gap: 8px; align-items: center; min-width: 0;
-  background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 8px;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 7px 8px;
 }
-.dcard .token { width: 34px; flex: none; font-size: 16px; }
-.dinfo { min-width: 0; display: grid; gap: 2px; flex: 1; }
-.dname { font-weight: 700; font-size: 14px; }
+.dcard .token { width: 32px; flex: none; font-size: 15px; }
+.dcard.egg-card { color: var(--text-dim); }
+.dcard .egg { width: 22px; height: 28px; flex: none; margin: 0 5px; }
+.dinfo { min-width: 0; display: grid; gap: 1px; flex: 1; }
+.dname { font-weight: 700; font-size: 13.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .dname small { font-weight: 500; color: var(--text-dim); font-size: 11px; margin-left: 4px; }
 .dlv { display: flex; align-items: center; gap: 6px; font-size: 12px; font-variant-numeric: tabular-nums; }
-.xpbar { flex: 1; min-width: 24px; height: 5px; background: rgba(0, 0, 0, .35); border-radius: 999px; overflow: hidden; }
+.xpbar { flex: 1; min-width: 20px; height: 5px; background: rgba(0, 0, 0, .35); border-radius: 999px; overflow: hidden; }
 .xpbar i { display: block; height: 100%; background: var(--text); transition: width .3s ease; }
 .dtoday { font-size: 12px; color: var(--text-dim); font-variant-numeric: tabular-nums; }
 
-/* 資源と操作 */
-.res { display: flex; align-items: center; gap: 14px; font-size: 14px; font-variant-numeric: tabular-nums; }
-.res .label { color: var(--text-dim); font-size: 12.5px; margin-right: 3px; }
-.res .spacer { flex: 1; }
-.buy {
-  background: transparent; border: 1px solid var(--line); border-radius: 999px;
-  padding: 6px 12px; font-size: 13px; cursor: pointer;
+/* 行商人 */
+.shop { display: grid; gap: 6px; }
+.shop-head { display: flex; align-items: baseline; gap: 14px; font-size: 14px; font-variant-numeric: tabular-nums; }
+.shop-head .label { color: var(--text-dim); font-size: 12.5px; margin-right: 3px; }
+.shop-head .title { font-size: 12.5px; color: var(--text-dim); margin-left: auto; }
+.wares { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.ware {
+  display: grid; gap: 1px; text-align: left; min-width: 0; cursor: pointer;
+  background: rgba(241, 230, 204, .05); border: 1px solid var(--line); border-radius: 10px; padding: 6px 8px;
 }
-.buy:disabled { opacity: .45; cursor: default; }
+.ware b { font-size: 13px; }
+.ware span { font-size: 11px; color: var(--text-dim); line-height: 1.35; }
+.ware em { font-style: normal; font-size: 12px; color: var(--warn); font-variant-numeric: tabular-nums; }
+.ware:disabled { opacity: .4; cursor: default; }
+.ware.sold { opacity: .3; }
+
+.actionbar {
+  position: sticky; bottom: 0; z-index: 5;
+  padding-block: 8px calc(10px + env(safe-area-inset-bottom, 0px));
+  background: linear-gradient(180deg, transparent, var(--ground) 30%);
+  transition: background .6s ease;
+  display: grid; gap: 4px;
+}
+body.night .actionbar { background: linear-gradient(180deg, transparent, var(--ground-night) 30%); }
 .primary {
   width: 100%; border: 0; border-radius: 12px; padding: 13px; cursor: pointer;
   font-weight: 700; font-size: 16px; color: #3a2200;
@@ -238,12 +287,13 @@ svg.beams { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 3;
 .primary:active { transform: translateY(2px); box-shadow: 0 1px 0 #b8741a; }
 .primary:disabled { filter: grayscale(.6) brightness(.75); cursor: default; }
 .hint { margin: 0; font-size: 12px; color: var(--text-dim); text-align: center; }
+.hint button { background: none; border: 0; color: var(--warn); text-decoration: underline; padding: 0 4px; cursor: pointer; }
 
 /* 重ねて出す画面 */
 .overlay {
   position: fixed; inset: 0; z-index: 20; overflow-y: auto;
   display: grid; place-items: end center;
-  background: rgba(5, 8, 6, .55);
+  background: rgba(5, 8, 6, .6);
   padding: calc(16px + env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) calc(16px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px));
 }
 .sheet {
@@ -254,10 +304,10 @@ svg.beams { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 3;
 .sheet h2 { font-family: var(--font-display); font-size: 26px; margin: 0; letter-spacing: .06em; text-wrap: balance; }
 .eyebrow { margin: 0; font-size: 11px; letter-spacing: .16em; color: var(--text-dim); }
 .story { margin: 0; }
-.howto { margin: 0; padding-left: 1.2em; display: grid; gap: 4px; font-size: 13.5px; color: var(--text-dim); }
-.howto b { font-weight: 700; }
+.howto { margin: 0; padding-left: 1.2em; display: grid; gap: 4px; font-size: 13px; color: var(--text-dim); }
+.howto b { font-weight: 700; color: var(--text); }
 
-.battle { place-items: center; background: rgba(8, 4, 14, .84); }
+.battle { place-items: center; background: rgba(8, 4, 14, .86); }
 .battle .sheet { background: #150d20; border-color: rgba(176, 108, 255, .3); }
 .battle-sum { margin: 0; font-size: 12.5px; color: var(--text-dim); font-variant-numeric: tabular-nums; }
 .boss-big {
@@ -268,16 +318,19 @@ svg.beams { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 3;
 }
 .boss-big .eyes { position: absolute; top: 34%; left: 0; right: 0; display: flex; justify-content: center; gap: 44px; }
 .boss-big .eyes i { width: 18px; height: 11px; border-radius: 50%; background: var(--shade-glow); box-shadow: 0 0 14px 3px var(--shade-glow); }
+.boss-big.rise { animation: rise 1.4s cubic-bezier(.2, .8, .3, 1); }
 .boss-big.hit { animation: shake .3s ease; }
+@keyframes rise { from { transform: translateY(60px); opacity: 0; } to { transform: none; opacity: 1; } }
 @keyframes shake { 25% { transform: translateX(-5px); } 50% { transform: translateX(4px); } 75% { transform: translateX(-2px); } }
 .hpbar { height: 12px; border-radius: 999px; background: rgba(0, 0, 0, .4); overflow: hidden; }
 .hpbar i { display: block; height: 100%; width: 100%; background: linear-gradient(90deg, #7a3cc9, var(--shade-glow)); transition: width .4s ease; }
 .hpnum { margin: 0; text-align: right; font-size: 12px; color: var(--text-dim); font-variant-numeric: tabular-nums; }
-.log { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; font-size: 14px; }
+.log { list-style: none; margin: 0; padding: 0; display: grid; gap: 3px; font-size: 13.5px; }
 .log .round { color: var(--text-dim); font-size: 12px; text-align: center; }
 .log .sun { color: #ffd27a; }
 .log .moon { color: #e2f1ff; }
 .log .shade { color: #cfa6ff; }
+.log .crit { font-weight: 700; }
 .result { display: grid; gap: 8px; }
 .result h3 { font-family: var(--font-display); font-size: 22px; margin: 4px 0 0; }
 .result h3.win { color: #ffd27a; }
@@ -305,15 +358,9 @@ svg.beams { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 3;
     <button type="button" class="ghost" id="helpBtn">遊び方</button>
   </header>
 
-  <section class="boss-panel" aria-label="影の竜">
-    <ol class="days" id="days"></ol>
-    <div class="boss-line"><strong>影の竜</strong><span id="wakeText"></span></div>
-    <div class="boss-meta">体力 <b id="bossHp"></b>・弱点 <b class="moon-t">月光</b>（ツクヨの攻撃が1.5倍）</div>
-    <div class="gauge" role="img" id="gauge"><i class="ghost-fill" id="gaugeGhost"></i><i class="fill" id="gaugeFill"></i></div>
-    <div class="gauge-label"><span id="predText"></span><span class="verdict" id="verdict"></span></div>
-  </section>
+  <div class="sky" id="sky"></div>
 
-  <div class="board-wrap">
+  <div class="board-wrap" id="boardWrap">
     <div class="board" id="board"></div>
     <div class="frame"></div>
     <div class="veil sunv"></div>
@@ -330,28 +377,53 @@ svg.beams { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 3;
     <div class="floats" id="floats"></div>
   </div>
 
+  <section class="under" aria-label="地底の影の竜">
+    <div class="strata" id="strata">
+      <span class="depthmark" style="top:6px">0m</span>
+      <span class="depthmark" style="bottom:2px">80m</span>
+      <div class="shade-icon" id="shadeIcon"><i></i><i></i></div>
+    </div>
+    <div class="under-info">
+      <div class="under-line"><strong>影の竜</strong><span id="depthText"></span></div>
+      <div class="under-meta" id="riseText"></div>
+      <div class="under-meta eta" id="etaText"></div>
+    </div>
+  </section>
+
+  <section class="odds" aria-label="決戦の見込み">
+    <div class="odds-line"><span>影の竜 体力 <b id="bossHp"></b>・弱点 <b class="moon-t">月光</b></span><span class="verdict" id="verdict"></span></div>
+    <div class="range" id="range" role="img"><i class="span" id="rangeSpan"></i><i class="hp" id="rangeHp"></i></div>
+    <div class="odds-line"><span id="oddsText"></span></div>
+  </section>
+
   <div class="dragons" id="dragons"></div>
 
-  <div class="res">
-    <span><span class="label">鱗</span><b id="scales">0</b></span>
-    <span><span class="label">鏡</span><b id="mirrorCount">0/2</b></span>
-    <span class="spacer"></span>
-    <button type="button" class="buy" id="buyBtn"></button>
+  <section class="shop" aria-label="行商人">
+    <div class="shop-head">
+      <span><span class="label">鱗</span><b id="scales">0</b></span>
+      <span><span class="label">鏡</span><b id="mirrorCount">0/2</b></span>
+      <span class="title">今朝の行商人</span>
+    </div>
+    <div class="wares" id="wares"></div>
+  </section>
+
+  <div class="actionbar">
+    <button type="button" class="primary" id="goBtn">この配置で1日を進める</button>
+    <p class="hint" id="hint"></p>
   </div>
-  <button type="button" class="primary" id="goBtn">この配置で1日を進める</button>
-  <p class="hint">マスをタップで鏡を置く。もう一度で向きを変え、3回目で外します。</p>
 </main>
 
 <div class="overlay" id="intro">
   <div class="sheet">
-    <p class="eyebrow">試作品 v0.1</p>
+    <p class="eyebrow">試作品 v0.2</p>
     <h2>竜と七日の庭</h2>
-    <p class="story">七日後の夜、王宮の庭で眠る影の竜が目を覚まし、王国を闇に沈めるという。飼育係のあなたに託されたのは、まだ幼い二頭の竜だけ。太陽と月の光を鏡で導いて竜を育て、国を守ってください。</p>
+    <p class="story">王宮の地の底で、影の竜が目を覚ましつつある。地上に出れば王国は闇に沈む。飼育係のあなたに託されたのは、まだ幼い二頭の竜と、小さな庭だけ。</p>
     <ul class="howto">
-      <li><b class="sun-t">☀︎ 太陽</b>は左から、<b class="moon-t">☾ 月</b>は上から差し込みます。</li>
-      <li>マスをタップして鏡を置くと光が曲がります。1つの配置で昼も夜も照らします。</li>
-      <li>光が通った竜が育ちます。好きな光なら成長が2倍。光が当たった竜1頭につき鱗が1枚落ち、鱗で鏡を買えます。</li>
-      <li>上のゲージが決戦の予想ダメージです。7日目が終わるまでに満タンにすれば勝てます。</li>
+      <li><b class="sun-t">☀︎ 太陽</b>は左から、<b class="moon-t">☾ 月</b>は上から差し込みます。入る位置と天気は毎日変わります。明日の位置は庭の外の点線の丸で見えます。</li>
+      <li>マスをタップすると鏡を置けます。もう一度で向きが変わり、3回目で外れます。</li>
+      <li>光が通った竜が育ちます。好きな光なら+3、そうでなければ+1。<b>1本の光で何頭も照らすと、2頭目から1頭につき全員に+2</b>。照らした竜1頭につき鱗が1枚落ち、朝の行商人から鏡や卵を買えます。</li>
+      <li>影の竜は毎晩10mずつ上がってきます。庭の<b>裂け目</b>が開いているほど速くなり（1つにつき+5m）、裂け目は光を吸います。<b>光の行き止まりを裂け目にすると封じられ</b>、影を押し戻せます。</li>
+      <li>影の竜が地上に出たら決戦です。会心の一撃が出るかは運しだい。10日目の夜には必ず現れます。</li>
     </ul>
     <button type="button" class="primary" id="startBtn">庭へ出る</button>
   </div>
@@ -359,8 +431,8 @@ svg.beams { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 3;
 
 <div class="overlay battle" id="battle" hidden>
   <div class="sheet">
-    <p class="eyebrow">七日目の夜</p>
-    <h2>影の竜が目を覚ました</h2>
+    <p class="eyebrow" id="battleEyebrow"></p>
+    <h2>影の竜が地上に現れた</h2>
     <p class="battle-sum" id="battleSum"></p>
     <div class="boss-big" id="bossBig"><span class="eyes"><i></i><i></i></span>影</div>
     <div class="hpbar"><i id="bossBar"></i></div>
@@ -370,7 +442,7 @@ svg.beams { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 3;
       <h3 id="resultTitle"></h3>
       <p id="resultText"></p>
       <button type="button" class="primary" id="againBtn">もう一度遊ぶ</button>
-      <p class="note">試作品 v0.1。難しさや楽しさの感想をチャットで送ってください。</p>
+      <p class="note">試作品 v0.2。難しさや楽しさの感想をチャットで送ってください。</p>
     </div>
   </div>
 </div>
@@ -379,82 +451,181 @@ svg.beams { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 3;
 
 <script>
 // ---- ゲームの設定（バランス調整はここ） ----
-const SIZE = 7;               // 庭は7×7マス
-const EDGE = 0.6;             // 光が入ってくる外周レーンの幅（マス単位）
+const SIZE = 7;                 // 庭は7×7マス
+const EDGE = 0.6;               // 光が入ってくる外周レーンの幅（マス単位）
 const UNIT = SIZE + EDGE;
-const SCHEDULE = [            // 日ごとに太陽が入る行・月が入る列（0始まり）
-  { sun: 2, moon: 1 },
-  { sun: 6, moon: 3 },
-  { sun: 0, moon: 0 },
-  { sun: 5, moon: 2 },
-  { sun: 3, moon: 4 },
-  { sun: 1, moon: 3 },
-  { sun: 4, moon: 4 },
-];
-const DRAGONS = [
-  { id: 'hinata', name: 'ヒナタ', kind: '陽竜', glyph: '陽', r: 4, c: 1, likes: 'sun', breath: '陽炎のブレス' },
-  { id: 'tsukuyo', name: 'ツクヨ', kind: '月竜', glyph: '月', r: 2, c: 4, likes: 'moon', breath: '月光のブレス' },
-];
-const ROCKS = [[1, 2], [3, 3], [5, 4]];
-const BOSS = { r: 0, c: 5, size: 2, hp: 240, weak: 'moon' };
-const START_MIRRORS = 2;
-const MIRROR_COSTS = [3, 5, 8, 12];
-const XP_PER_LEVEL = 3;
-const ATK_PER_LEVEL = 6;
+const MAX_DAYS = 10;            // 10日目の夜には必ず現れる
+const START_DEPTH = 70;         // 影の竜の最初の深さ(m)
+const DEPTH_CAP = 80;
+const RISE_BASE = 10;           // 毎晩上がる基本の深さ
+const RISE_PER_CRACK = 5;       // 開いた裂け目1つにつき追加で上がる
+const SEAL_PUSH = 5;            // 裂け目を封じると押し戻す深さ
+const ROCK_COUNT = 4;
+const START_MIRRORS = 3;
+const MAX_MIRRORS = 6;
+const START_SCALES = 3;
+const MAX_DRAGONS = 4;          // 卵を含む
+const BOSS_HP = 200;
+const BOSS_WEAK = 'moon';
 const WEAK_MULT = 1.5;
+const ATK_PER_LEVEL = 5;
+const GAIN_LIKED = 3;            // 好きな光の成長
+const GAIN_OTHER = 1;            // 好きではない光の成長
+const CHAIN_BONUS = 2;           // 1本の光で照らした2頭目以降1頭につき、全員に加わる成長
+const XP_PER_LEVEL = 4;
 const ROUNDS = 3;
+const CRIT_RATE = 0.2;
+const CRIT_MULT = 1.5;
+const WEATHER = {
+  sunny:    { name: '晴れ', sun: 1, moon: 1, weight: 50 },
+  clear:    { name: '快晴', sun: 2, moon: 1, weight: 15, tone: 'good', note: '日差し×2' },
+  cloudy:   { name: '曇り', sun: 0, moon: 1, weight: 15, tone: 'bad', note: '太陽なし' },
+  fullmoon: { name: '満月', sun: 1, moon: 2, weight: 10, tone: 'good', note: '月光×2' },
+  newmoon:  { name: '新月', sun: 1, moon: 0, weight: 10, tone: 'bad', note: '月なし' },
+};
+const WARES = {
+  mirror: { name: '鏡', price: 4, text: '鏡が1枚増える' },
+  egg:    { name: '竜の卵', price: 6, text: '明日の朝かえる' },
+  seal:   { name: '封印の札', price: 5, text: '影を15m押し戻す' },
+  feast:  { name: '竜のごちそう', price: 5, text: '全員の成長+2' },
+  incense:{ name: '満月の香', price: 4, text: '今夜の月光×2' },
+};
+const SEAL_CHARM_PUSH = 15;
+const HATCH_NAMES = { sun: ['ホムラ', 'アサヒ', 'カガリ'], moon: ['シズク', 'ヨイ', 'サヤ'] };
 
 const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const $ = id => document.getElementById(id);
 const board = $('board'), beamsG = $('beams'), floats = $('floats');
 
-function freshState() {
-  return { screen: 'intro', day: 1, mirrors: {}, owned: START_MIRRORS, bought: 0, scales: 0, xp: { hinata: 0, tsukuyo: 0 } };
+// ---- 乱数（途中から再開できるよう状態ごと保存する） ----
+function rand() {
+  let t = (S.rng = (S.rng + 0x6D2B79F5) >>> 0);
+  t = Math.imul(t ^ (t >>> 15), t | 1);
+  t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+  return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
 }
-let S = freshState();
-let busy = false;
+const randInt = n => Math.floor(rand() * n);
+function pickWeather() {
+  const total = Object.values(WEATHER).reduce((a, w) => a + w.weight, 0);
+  let x = rand() * total;
+  for (const [k, w] of Object.entries(WEATHER)) { x -= w.weight; if (x < 0) return k; }
+  return 'sunny';
+}
+const makeDay = () => ({ sun: randInt(SIZE), moon: randInt(SIZE), weather: pickWeather() });
+
+// ---- 盤面 ----
+const key = (r, c) => r + ',' + c;
+const unkey = k => k.split(',').map(Number);
+function newGame(seed) {
+  S = {
+    screen: 'intro', rng: seed >>> 0, day: 1, depth: START_DEPTH,
+    dragons: [
+      { id: 'hinata', name: 'ヒナタ', type: 'sun', r: 4, c: 1, xp: 0 },
+      { id: 'tsukuyo', name: 'ツクヨ', type: 'moon', r: 2, c: 4, xp: 0 },
+    ],
+    eggs: [], rocks: [], cracks: [], newCracks: [], mirrors: {},
+    owned: START_MIRRORS, scales: START_SCALES, wares: [], sold: [], incense: false, placing: null,
+    hatched: 0, sealedTotal: 0,
+  };
+  // 1日目の光の通り道（3行目と2列目）には岩と裂け目を置かない
+  const reserved = (r, c) => r === 2 || c === 1;
+  for (let i = 0; i < ROCK_COUNT; i++) S.rocks.push(randomEmpty(reserved));
+  S.cracks.push(randomEmpty(reserved));
+  S.forecast = [{ sun: 2, moon: 1, weather: 'sunny' }, makeDay()];
+  rollWares();
+}
+function occupied(r, c) {
+  const k = key(r, c);
+  return S.rocks.includes(k) || S.cracks.includes(k) || !!S.mirrors[k] || S.eggs.some(e => e.k === k) || !!dragonAt(r, c);
+}
+function randomEmpty(skip = () => false) {
+  for (let i = 0; i < 200; i++) {
+    const r = randInt(SIZE), c = randInt(SIZE);
+    if (!occupied(r, c) && !skip(r, c)) return key(r, c);
+  }
+  return null;
+}
+function rollWares() {
+  const pool = ['egg', 'seal', 'feast', 'incense'];
+  const a = pool.splice(randInt(pool.length), 1)[0];
+  const b = pool.splice(randInt(pool.length), 1)[0];
+  S.wares = ['mirror', a, b];
+  S.sold = [];
+}
 
 // ---- ルール ----
-const key = (r, c) => r + ',' + c;
-const rockSet = new Set(ROCKS.map(([r, c]) => key(r, c)));
-const inBoss = (r, c) => r >= BOSS.r && r < BOSS.r + BOSS.size && c >= BOSS.c && c < BOSS.c + BOSS.size;
-const dragonAt = (r, c) => DRAGONS.find(d => d.r === r && d.c === c);
-const level = xp => 1 + Math.floor(xp / XP_PER_LEVEL);
-const attackAt = (d, xp) => level(xp) * ATK_PER_LEVEL * (d.likes === BOSS.weak ? WEAK_MULT : 1);
-const gainFor = (d, light) => (d.likes === light ? 2 : 1);
+const today = () => S.forecast[0];
+const dragonAt = (r, c) => S.dragons.find(d => d.r === r && d.c === c);
+const XP_TABLE = Array.from({ length: 40 }, (_, i) => i * XP_PER_LEVEL);  // 各レベルに必要な合計の成長
+const level = xp => { let L = 1; while (L < XP_TABLE.length && xp >= XP_TABLE[L]) L++; return L; };
+const nextXp = xp => XP_TABLE[level(xp)] ?? XP_TABLE[XP_TABLE.length - 1];
+const attackAt = (d, xp = d.xp) => level(xp) * ATK_PER_LEVEL * (d.type === BOSS_WEAK ? WEAK_MULT : 1);
 const mirrorsUsed = () => Object.keys(S.mirrors).length;
-const predictedWith = (extra = {}) =>
-  Math.round(ROUNDS * DRAGONS.reduce((sum, d) => sum + attackAt(d, S.xp[d.id] + (extra[d.id] || 0)), 0));
+function lightMult(light) {
+  const w = WEATHER[today().weather];
+  if (light === 'sun') return w.sun;
+  return w.moon === 0 ? 0 : w.moon * (S.incense ? 2 : 1);
+}
 
-// 光の通り道を求める。竜は光を通し、岩と影の竜は光を止める
+// 光の通り道。竜と卵は光を通し、岩は止め、裂け目は光を吸って封じられる
 function trace(light) {
-  const sched = SCHEDULE[S.day - 1];
+  const mult = lightMult(light);
+  const t = today();
   let r, c, dr, dc;
-  if (light === 'sun') { r = sched.sun; c = 0; dr = 0; dc = 1; }
-  else { r = 0; c = sched.moon; dr = 1; dc = 0; }
-  const pts = [light === 'sun' ? [EDGE / 2, EDGE + r + .5] : [EDGE + c + .5, EDGE / 2]];
-  const lit = [], seen = new Set();
-  let end = 'exit';
+  if (light === 'sun') { r = t.sun; c = 0; dr = 0; dc = 1; } else { r = 0; c = t.moon; dr = 1; dc = 0; }
+  const res = { light, mult, pts: [light === 'sun' ? [EDGE / 2, EDGE + r + .5] : [EDGE + c + .5, EDGE / 2]], lit: [], end: 'exit', seal: null, gains: {} };
+  if (mult === 0) { res.end = 'none'; res.pts = []; return res; }
+  const seen = new Set();
   while (r >= 0 && r < SIZE && c >= 0 && c < SIZE) {
-    const k = `${r},${c},${dr},${dc}`;
-    if (seen.has(k)) { end = 'loop'; break; }
-    seen.add(k);
-    if (rockSet.has(key(r, c))) { end = 'rock'; break; }
-    if (inBoss(r, c)) { end = 'boss'; break; }
-    pts.push([EDGE + c + .5, EDGE + r + .5]);
+    const k = key(r, c), sk = `${k},${dr},${dc}`;
+    if (seen.has(sk)) { res.end = 'loop'; break; }
+    seen.add(sk);
+    if (S.rocks.includes(k)) { res.end = 'rock'; break; }
+    if (S.cracks.includes(k)) { res.end = 'crack'; res.seal = k; break; }
+    res.pts.push([EDGE + c + .5, EDGE + r + .5]);
     const d = dragonAt(r, c);
-    if (d && !lit.includes(d)) lit.push(d);
-    const m = S.mirrors[key(r, c)];
+    if (d && !res.lit.includes(d)) res.lit.push(d);
+    const m = S.mirrors[k];
     if (m === '/') [dr, dc] = [-dc, -dr];
     else if (m === '\\') [dr, dc] = [dc, dr];
     r += dr; c += dc;
   }
-  if (end !== 'loop') {
-    const back = end === 'boss' ? .2 : .5;
-    pts.push([EDGE + c + .5 - dc * back, EDGE + r + .5 - dr * back]);
+  if (res.end !== 'loop') {
+    const back = res.end === 'crack' ? .15 : .5;
+    res.pts.push([EDGE + c + .5 - dc * back, EDGE + r + .5 - dr * back]);
   }
-  return { pts, lit, end };
+  const chain = res.lit.length - 1;
+  for (const d of res.lit) res.gains[d.id] = ((d.type === light ? GAIN_LIKED : GAIN_OTHER) + chain * CHAIN_BONUS) * mult;
+  return res;
 }
+
+// 今夜どれだけ上がってくるか
+function nightPlan(sun, moon) {
+  const sealed = new Set([sun.seal, moon.seal].filter(Boolean));
+  const open = S.cracks.length - sealed.size;
+  const change = -RISE_BASE - RISE_PER_CRACK * open + SEAL_PUSH * sealed.size;
+  return { sealed: sealed.size, open, change };
+}
+const newCrackCount = day => (day >= 4 ? 2 : 1);
+function eta(sun, moon) {
+  const plan = nightPlan(sun, moon);
+  let depth = Math.min(DEPTH_CAP, S.depth + plan.change);
+  if (depth <= 0 || S.day >= MAX_DAYS) return { night: S.day, plan };
+  let open = plan.open, day = S.day;
+  while (day < MAX_DAYS) {
+    open += newCrackCount(day);
+    day++;
+    depth -= RISE_BASE + RISE_PER_CRACK * open;
+    if (depth <= 0) return { night: day, plan };
+  }
+  return { night: MAX_DAYS, plan, cap: true };
+}
+function damageRange(extra = {}) {
+  const base = ROUNDS * S.dragons.reduce((a, d) => a + attackAt(d, d.xp + (extra[d.id] || 0)), 0);
+  return { min: Math.round(base), max: Math.round(base * CRIT_MULT) };
+}
+
+let busy = false;
 
 // ---- 描画 ----
 function render() {
@@ -462,99 +633,147 @@ function render() {
   renderBoard(traces);
   renderHud(traces);
   if (traces) {
-    beamsG.replaceChildren(polyline(traces.sun.pts, 'beam preview sun'), polyline(traces.moon.pts, 'beam preview moon'));
+    beamsG.replaceChildren(...['sun', 'moon'].filter(l => traces[l].pts.length).map(l => polyline(traces[l].pts, `beam preview ${l}`)));
   }
 }
 
 function renderBoard(traces) {
-  const sched = SCHEDULE[S.day - 1];
+  const t = today();
+  const sunM = lightMult('sun'), moonM = lightMult('moon');
   const litSun = new Set(traces ? traces.sun.lit.map(d => d.id) : []);
   const litMoon = new Set(traces ? traces.moon.lit.map(d => d.id) : []);
   const out = [];
+  // 明日の光が入る位置は点線の丸で見せる
+  const t1 = S.day < MAX_DAYS ? S.forecast[1] : null;
+  const idle = (isNext, light) => isNext
+    ? `<span class="next ${light}" role="img" aria-label="明日の${light === 'sun' ? '太陽' : '月'}"></span>`
+    : '<span class="tick"></span>';
   for (let i = 0; i < SIZE; i++) {
-    out.push(`<div class="edge" style="grid-row:1;grid-column:${i + 2}">${i === sched.moon ? '<span class="src moon" role="img" aria-label="月の光">☾</span>' : '<span class="tick"></span>'}</div>`);
-    out.push(`<div class="edge" style="grid-row:${i + 2};grid-column:1">${i === sched.sun ? '<span class="src sun" role="img" aria-label="太陽の光">☀︎</span>' : '<span class="tick"></span>'}</div>`);
+    const moonCls = moonM === 0 ? ' off' : moonM > 1 ? ' strong' : '';
+    const sunCls = sunM === 0 ? ' off' : sunM > 1 ? ' strong' : '';
+    out.push(`<div class="edge" style="grid-row:1;grid-column:${i + 2}">${i === t.moon ? `<span class="src moon${moonCls}" role="img" aria-label="月の光${moonM === 0 ? '（新月）' : ''}">${moonM === 0 ? '●' : '☾'}</span>` : idle(t1 && i === t1.moon, 'moon')}</div>`);
+    out.push(`<div class="edge" style="grid-row:${i + 2};grid-column:1">${i === t.sun ? `<span class="src sun${sunCls}" role="img" aria-label="太陽の光${sunM === 0 ? '（曇り）' : ''}">${sunM === 0 ? '☁︎' : '☀︎'}</span>` : idle(t1 && i === t1.sun, 'sun')}</div>`);
   }
-  const open = (.12 + .88 * (S.day - 1) / (SCHEDULE.length - 1)).toFixed(2);
   for (let r = 0; r < SIZE; r++) {
     for (let c = 0; c < SIZE; c++) {
+      const k = key(r, c);
       const pos = `grid-row:${r + 2};grid-column:${c + 2}`;
       const alt = (r + c) % 2 ? ' alt' : '';
-      if (inBoss(r, c)) {
-        if (r === BOSS.r && c === BOSS.c) {
-          out.push(`<div class="boss${S.day === SCHEDULE.length ? ' stir' : ''}" id="bossTile" style="grid-row:${r + 2} / span ${BOSS.size};grid-column:${c + 2} / span ${BOSS.size};--open:${open}" role="img" aria-label="眠っている影の竜"><span class="kanji">影</span><span class="eyes"><i></i><i></i></span><span class="zzz">z</span></div>`);
-        }
+      if (S.rocks.includes(k)) {
+        out.push(`<div class="cell${alt}" style="${pos}"><span class="rock" role="img" aria-label="岩"></span></div>`);
         continue;
       }
-      if (rockSet.has(key(r, c))) {
-        out.push(`<div class="cell${alt}" style="${pos}"><span class="rock" role="img" aria-label="岩"></span></div>`);
+      if (S.cracks.includes(k)) {
+        out.push(`<div class="cell${alt}" style="${pos}"><span class="crack${S.newCracks.includes(k) ? ' new' : ''}" role="img" aria-label="影の裂け目"></span></div>`);
         continue;
       }
       const d = dragonAt(r, c);
       if (d) {
         const lit = (litSun.has(d.id) ? ' lit-sun' : '') + (litMoon.has(d.id) ? ' lit-moon' : '');
-        const lv = level(S.xp[d.id]);
-        out.push(`<div class="cell${alt}" style="${pos}"><span class="token ${d.likes}${lit}" role="img" aria-label="${d.name} レベル${lv}">${d.glyph}<span class="lv">${lv}</span></span></div>`);
+        const lv = level(d.xp);
+        out.push(`<div class="cell${alt}" style="${pos}"><span class="token ${d.type}${lit}" role="img" aria-label="${d.name} レベル${lv}">${d.type === 'sun' ? '陽' : '月'}<span class="lv">${lv}</span></span></div>`);
         continue;
       }
-      const m = S.mirrors[key(r, c)];
+      if (S.eggs.some(e => e.k === k)) {
+        out.push(`<div class="cell${alt}" style="${pos}"><span class="egg" role="img" aria-label="竜の卵"></span></div>`);
+        continue;
+      }
+      const m = S.mirrors[k];
       const label = `${r + 1}行${c + 1}列 ${m ? (m === '/' ? '鏡（／）' : '鏡（＼）') : '空き'}`;
-      out.push(`<button type="button" class="cell${alt}" style="${pos}" data-r="${r}" data-c="${c}" aria-label="${label}">${m ? `<span class="mirror ${m === '/' ? 'slash' : 'back'}"></span>` : ''}</button>`);
+      out.push(`<button type="button" class="cell${alt}${m ? ' has' : ''}" style="${pos}" data-r="${r}" data-c="${c}" aria-label="${label}">${m ? `<span class="mirror ${m === '/' ? 'slash' : 'back'}"></span>` : ''}</button>`);
     }
   }
   board.innerHTML = out.join('');
+  board.classList.toggle('placing', S.placing === 'egg');
+  // 開いたばかりの裂け目の演出は最初の1回だけ
+  if (S.newCracks.length) setTimeout(() => { S.newCracks = []; }, 700);
+}
+
+function wxLabel(w) {
+  const x = WEATHER[w];
+  return `<span class="wx${x.tone ? ' ' + x.tone : ''}">${x.name}${x.note ? `（${x.note}）` : ''}</span>`;
 }
 
 function renderHud(traces) {
-  $('days').innerHTML = SCHEDULE.map((_, i) => {
-    const n = i + 1;
-    const cls = n < S.day ? 'done' : n === S.day ? 'now' : '';
-    return `<li class="${cls}"${n === S.day ? ' aria-current="step"' : ''}>${n}日</li>`;
-  }).join('') + '<li class="wake">影</li>';
-  $('wakeText').textContent = S.day < SCHEDULE.length ? `目覚めまで あと${SCHEDULE.length + 1 - S.day}日` : '今夜、目を覚ます';
-  $('bossHp').textContent = BOSS.hp;
+  const [t0, t1] = S.forecast;
+  $('sky').innerHTML = `<span class="day">${S.day}日目<small>/ 最長${MAX_DAYS}日</small></span><span>今日 ${wxLabel(t0.weather)}${S.incense && WEATHER[t0.weather].moon ? '<span class="wx good">・香で月光×2</span>' : ''}</span>${S.day < MAX_DAYS ? `<span>明日 ${wxLabel(t1.weather)}・☀︎${t1.sun + 1}行 ☾${t1.moon + 1}列</span>` : ''}`;
 
-  const today = {};
-  for (const d of DRAGONS) {
-    const sunG = traces && traces.sun.lit.includes(d) ? gainFor(d, 'sun') : 0;
-    const moonG = traces && traces.moon.lit.includes(d) ? gainFor(d, 'moon') : 0;
-    today[d.id] = { sunG, moonG };
+  // 地底
+  const plan = traces ? nightPlan(traces.sun, traces.moon) : null;
+  $('depthText').textContent = `地下${Math.max(0, S.depth)}m`;
+  $('shadeIcon').style.top = `${10 + Math.max(0, Math.min(DEPTH_CAP, S.depth)) / DEPTH_CAP * 74}px`;
+  $('shadeIcon').classList.toggle('near', S.depth <= 25);
+  if (plan) {
+    const parts = [`基本−${RISE_BASE}`];
+    if (plan.open) parts.push(`裂け目${plan.open}つ −${plan.open * RISE_PER_CRACK}`);
+    if (plan.sealed) parts.push(`封印${plan.sealed}つ +${plan.sealed * SEAL_PUSH}`);
+    $('riseText').innerHTML = `今夜 <b>${plan.change > 0 ? '+' : plan.change < 0 ? '−' : '±'}${Math.abs(plan.change)}m</b>（${parts.join('・')}）`;
+    const e = eta(traces.sun, traces.moon);
+    const et = $('etaText');
+    if (e.night === S.day) { et.textContent = '今夜、地上に出てくる'; et.className = 'under-meta eta bad'; }
+    else {
+      et.textContent = e.cap ? `このままだと${MAX_DAYS}日目の夜に現れる（最長）` : `このままだと${e.night}日目の夜に現れる`;
+      et.className = 'under-meta eta' + (e.night - S.day <= 1 ? ' warn' : '');
+    }
+  } else {
+    $('riseText').textContent = '光を浴びている…';
   }
-  const pred = predictedWith();
-  const extra = Object.fromEntries(DRAGONS.map(d => [d.id, today[d.id].sunG + today[d.id].moonG]));
-  const after = traces ? predictedWith(extra) : pred;
-  $('gaugeFill').style.width = Math.min(100, pred / BOSS.hp * 100) + '%';
-  $('gaugeGhost').style.width = Math.min(100, after / BOSS.hp * 100) + '%';
-  $('gauge').setAttribute('aria-label', `決戦の予想ダメージ ${pred} / ${BOSS.hp}`);
-  $('predText').innerHTML = `決戦の予想ダメージ <b>${pred}</b>${after > pred ? `<span class="plus">今日の光で+${after - pred}</span>` : ''} / ${BOSS.hp}`;
-  const v = $('verdict');
-  v.textContent = pred >= BOSS.hp ? 'いまの戦力で勝てる' : `あと${BOSS.hp - pred}足りない`;
-  v.className = 'verdict ' + (pred >= BOSS.hp ? 'good' : 'bad');
 
-  $('dragons').innerHTML = DRAGONS.map(d => {
-    const xp = S.xp[d.id], lv = level(xp), t = today[d.id];
-    const pct = (xp % XP_PER_LEVEL) / XP_PER_LEVEL * 100;
-    const todayText = traces
-      ? `今日 <span class="sun-t">☀︎+${t.sunG}</span> <span class="moon-t">☾+${t.moonG}</span>`
-      : '光を浴びている…';
+  // 決戦の見込み
+  const extra = {};
+  if (traces) for (const d of S.dragons) extra[d.id] = (traces.sun.gains[d.id] || 0) + (traces.moon.gains[d.id] || 0);
+  const now = damageRange();
+  const after = damageRange(extra);
+  $('bossHp').textContent = BOSS_HP;
+  const scaleMax = Math.max(BOSS_HP * 1.6, after.max);
+  $('rangeSpan').style.left = after.min / scaleMax * 100 + '%';
+  $('rangeSpan').style.width = Math.max(1, (after.max - after.min) / scaleMax * 100) + '%';
+  $('rangeHp').style.left = BOSS_HP / scaleMax * 100 + '%';
+  $('range').setAttribute('aria-label', `今日の光のあとの予想ダメージ ${after.min}〜${after.max}、影の竜の体力 ${BOSS_HP}`);
+  $('oddsText').innerHTML = `決戦の予想ダメージ <b>${after.min}〜${after.max}</b>${after.min > now.min ? `（今日の光で+${after.min - now.min}）` : ''}　会心しだいで上がる`;
+  const v = $('verdict');
+  if (after.min >= BOSS_HP) { v.textContent = '会心なしでも勝てる'; v.className = 'verdict good'; }
+  else if (after.max >= BOSS_HP) { v.textContent = '会心しだい'; v.className = 'verdict warn'; }
+  else { v.textContent = `会心でも${BOSS_HP - after.max}足りない`; v.className = 'verdict bad'; }
+
+  // 竜
+  const cards = S.dragons.map(d => {
+    const lv = level(d.xp), base = XP_TABLE[lv - 1], next = nextXp(d.xp);
+    const pct = next > base ? (d.xp - base) / (next - base) * 100 : 100;
+    const sg = traces ? traces.sun.gains[d.id] || 0 : 0, mg = traces ? traces.moon.gains[d.id] || 0 : 0;
     return `<div class="dcard">
-      <span class="token ${d.likes}" aria-hidden="true">${d.glyph}</span>
+      <span class="token ${d.type}" aria-hidden="true">${d.type === 'sun' ? '陽' : '月'}</span>
       <div class="dinfo">
-        <div class="dname">${d.name}<small>${d.likes === 'sun' ? '太陽' : '月'}好き</small></div>
-        <div class="dlv">Lv ${lv}<span class="xpbar"><i style="width:${pct}%"></i></span>攻${Math.round(attackAt(d, xp))}</div>
-        <div class="dtoday">${todayText}</div>
+        <div class="dname">${d.name}<small>${d.type === 'sun' ? '太陽' : '月'}好き</small></div>
+        <div class="dlv">Lv${lv}<span class="xpbar"><i style="width:${pct}%"></i></span>攻${Math.round(attackAt(d))}</div>
+        <div class="dtoday">${traces ? `今日 <span class="sun-t">☀︎+${sg}</span> <span class="moon-t">☾+${mg}</span>` : '光を浴びている…'}</div>
       </div>
     </div>`;
-  }).join('');
+  });
+  for (const e of S.eggs) cards.push(`<div class="dcard egg-card"><span class="egg" aria-hidden="true"></span><div class="dinfo"><div class="dname">竜の卵</div><div class="dtoday">明日の朝かえる</div></div></div>`);
+  $('dragons').innerHTML = cards.join('');
 
+  // 行商人
   $('scales').textContent = S.scales;
   $('mirrorCount').textContent = `${mirrorsUsed()}/${S.owned}`;
-  const cost = MIRROR_COSTS[S.bought];
-  const buy = $('buyBtn');
-  buy.textContent = cost === undefined ? '鏡は売り切れ' : `鏡を買う・鱗${cost}`;
-  buy.disabled = busy || cost === undefined;
-  $('goBtn').disabled = busy || S.screen !== 'play';
-  $('goBtn').textContent = S.day === SCHEDULE.length ? 'この配置で最後の1日を進める' : 'この配置で1日を進める';
+  $('wares').innerHTML = S.wares.map((id, i) => {
+    const w = WARES[id], sold = S.sold.includes(i);
+    const blocked = busy || sold || S.screen !== 'play' || S.placing || !canBuy(id);
+    return `<button type="button" class="ware${sold ? ' sold' : ''}" data-i="${i}"${blocked ? ' disabled' : ''}><b>${w.name}</b><span>${sold ? '買った' : w.text}</span><em>鱗${w.price}</em></button>`;
+  }).join('');
+
+  $('goBtn').disabled = busy || S.screen !== 'play' || !!S.placing;
+  $('goBtn').textContent = S.day === MAX_DAYS ? 'この配置で最後の1日を進める' : 'この配置で1日を進める';
+  $('hint').innerHTML = S.placing === 'egg'
+    ? '卵を置くマスをタップしてください<button type="button" id="cancelEgg">やめる</button>'
+    : 'マスをタップで鏡。もう一度で向きを変え、3回目で外す';
+}
+
+function canBuy(id) {
+  if (id === 'mirror') return S.owned < MAX_MIRRORS;
+  if (id === 'egg') return S.dragons.length + S.eggs.length < MAX_DRAGONS;
+  if (id === 'incense') return WEATHER[today().weather].moon > 0 && !S.incense;
+  return true;
 }
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
@@ -576,12 +795,12 @@ function floatAt(r, c, text, cls, dy = 0) {
 }
 
 let toastTimer;
-function toast(msg) {
+function toast(msg, ms = 2600) {
   const t = $('toast');
   t.textContent = msg;
   t.classList.add('show');
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => t.classList.remove('show'), 2600);
+  toastTimer = setTimeout(() => t.classList.remove('show'), ms);
 }
 
 const wait = ms => new Promise(res => setTimeout(res, reduceMotion ? Math.min(ms, 120) : ms));
@@ -590,10 +809,17 @@ const wait = ms => new Promise(res => setTimeout(res, reduceMotion ? Math.min(ms
 function onCell(r, c) {
   if (busy || S.screen !== 'play') return;
   const k = key(r, c), cur = S.mirrors[k];
+  if (S.placing === 'egg') {
+    if (occupied(r, c)) { toast('空いているマスを選んでください'); return; }
+    S.eggs.push({ k });
+    S.placing = null;
+    render();
+    toast('卵を置きました。明日の朝かえります');
+    return;
+  }
   if (!cur) {
     if (mirrorsUsed() >= S.owned) {
-      const cost = MIRROR_COSTS[S.bought];
-      toast(cost === undefined ? '鏡はもう増やせません。置いた鏡を動かしてください' : `鏡が足りません。鱗${cost}枚で1枚買えます`);
+      toast(S.owned >= MAX_MIRRORS ? '鏡はもう増やせません。置いた鏡を動かしてください' : '鏡が足りません。行商人から買えます');
       return;
     }
     S.mirrors[k] = '/';
@@ -605,20 +831,35 @@ function onCell(r, c) {
   render();
 }
 
-function buyMirror() {
-  if (busy) return;
-  const cost = MIRROR_COSTS[S.bought];
-  if (cost === undefined) return;
-  if (S.scales < cost) { toast(`鱗があと${cost - S.scales}枚足りません`); return; }
-  S.scales -= cost;
-  S.bought++;
-  S.owned++;
+function buyWare(i) {
+  if (busy || S.screen !== 'play' || S.placing || S.sold.includes(i)) return;
+  const id = S.wares[i], w = WARES[id];
+  if (!canBuy(id)) return;
+  if (S.scales < w.price) { toast(`鱗があと${w.price - S.scales}枚足りません`); return; }
+  S.scales -= w.price;
+  S.sold.push(i);
+  if (id === 'mirror') { S.owned++; toast('鏡を1枚買いました'); }
+  if (id === 'egg') { S.placing = 'egg'; toast('卵を置くマスをタップしてください'); }
+  if (id === 'seal') { S.depth = Math.min(DEPTH_CAP, S.depth + SEAL_CHARM_PUSH); toast(`影の竜を${SEAL_CHARM_PUSH}m押し戻しました`); }
+  if (id === 'feast') {
+    for (const d of S.dragons) { d.xp += 2; floatAt(d.r, d.c, '+2', 'sun'); }
+    toast('竜たちがごちそうを平らげた');
+  }
+  if (id === 'incense') { S.incense = true; toast('今夜の月光が2倍になります'); }
   render();
-  toast('鏡を1枚買いました');
 }
 
-function fire(t, light) {
-  const p = polyline(t.pts, `beam fire ${light}`);
+function cancelEgg() {
+  if (S.placing !== 'egg') return;
+  const i = S.wares.indexOf('egg');
+  S.sold = S.sold.filter(x => x !== i);
+  S.scales += WARES.egg.price;
+  S.placing = null;
+  render();
+}
+
+function fire(t) {
+  const p = polyline(t.pts, `beam fire ${t.light}`);
   p.setAttribute('filter', 'url(#glow)');
   beamsG.append(p);
   if (reduceMotion) return wait(150);
@@ -633,56 +874,104 @@ function fire(t, light) {
   return wait(dur);
 }
 
-function grant(t, light) {
+// 光を当てた結果を反映する
+function applyLight(t) {
   let scales = 0;
   t.lit.forEach((d, i) => {
-    const before = level(S.xp[d.id]);
-    const g = gainFor(d, light);
-    S.xp[d.id] += g;
+    const before = level(d.xp), g = t.gains[d.id];
+    d.xp += g;
     S.scales += 1;
     scales += 1;
     setTimeout(() => {
-      floatAt(d.r, d.c, `${light === 'sun' ? '☀︎' : '☾'}+${g}`, light);
-      if (level(S.xp[d.id]) > before) floatAt(d.r, d.c, 'Lv UP', 'lvup', -.55);
+      floatAt(d.r, d.c, `${t.light === 'sun' ? '☀︎' : '☾'}+${g}`, t.light);
+      if (level(d.xp) > before) floatAt(d.r, d.c, 'Lv UP', 'lvup', -.55);
     }, i * 120);
   });
-  render();
-  if (t.end === 'boss') {
-    const b = $('bossTile');
-    if (b) b.classList.add('absorb');
-    floatAt(BOSS.r + .5, BOSS.c + .5, '光を飲み込んだ', 'shade');
+  if (t.seal && S.cracks.includes(t.seal)) {
+    S.cracks = S.cracks.filter(k => k !== t.seal);
+    S.sealedTotal++;
+    const [r, c] = unkey(t.seal);
+    floatAt(r, c, '封印', 'shade');
   }
   return scales;
 }
 
 async function advance() {
-  if (busy || S.screen !== 'play') return;
+  if (busy || S.screen !== 'play' || S.placing) return;
   busy = true;
+  S.newCracks = [];
+  // その日の光の道は朝の盤面で決まる（予告どおりになるよう、昼に封じた裂け目で月の道は変えない）
   const sun = trace('sun'), moon = trace('moon');
+  const plan = nightPlan(sun, moon);
   render();
   beamsG.replaceChildren();
-  document.body.classList.add('sunlit');
-  await fire(sun, 'sun');
-  const got = grant(sun, 'sun');
-  await wait(700);
-  document.body.classList.remove('sunlit');
+  let got = 0;
+  // 昼
+  if (sun.pts.length) {
+    document.body.classList.add('sunlit');
+    await fire(sun);
+    got += applyLight(sun);
+    render();
+    await wait(700);
+    document.body.classList.remove('sunlit');
+  } else {
+    toast('曇りで太陽が出ない…', 1400);
+    await wait(900);
+  }
+  // 夜
   document.body.classList.add('night');
   await wait(550);
-  await fire(moon, 'moon');
-  const got2 = grant(moon, 'moon');
-  await wait(1000);
+  if (moon.pts.length) {
+    await fire(moon);
+    got += applyLight(moon);
+    render();
+    await wait(900);
+  } else {
+    toast('新月で月が出ない…', 1400);
+    await wait(900);
+  }
   beamsG.replaceChildren();
-  if (S.day === SCHEDULE.length) {
+  // 夜明け前: 影の竜が上がってくる
+  S.depth = Math.min(DEPTH_CAP, S.depth + plan.change);
+  $('boardWrap').classList.remove('quake');
+  void $('boardWrap').offsetWidth;
+  $('boardWrap').classList.add('quake');
+  render();
+  await wait(900);
+  if (S.depth <= 0 || S.day >= MAX_DAYS) {
     busy = false;
     startBattle();
     return;
   }
-  S.day++;
-  document.body.classList.remove('night');
+  // 新しい裂け目
+  for (let i = 0; i < newCrackCount(S.day); i++) {
+    const k = randomEmpty();
+    if (k) { S.cracks.push(k); S.newCracks.push(k); }
+  }
+  startMorning();
   busy = false;
+  document.body.classList.remove('night');
   render();
-  const total = got + got2;
-  toast(total ? `${S.day}日目の朝。鱗を${total}枚拾いました` : `${S.day}日目の朝。昨日は光が竜に届きませんでした`);
+  const hatchNote = S.lastHatch ? `${S.lastHatch}がかえった。` : '';
+  toast(`${S.day}日目の朝。${hatchNote}鱗を${got}枚拾った。裂け目が${S.newCracks.length}つ開いた`, 3200);
+}
+
+function startMorning() {
+  S.day++;
+  S.forecast = [S.forecast[1], makeDay()];
+  S.incense = false;
+  S.lastHatch = '';
+  for (const e of S.eggs) {
+    const [r, c] = unkey(e.k);
+    const type = rand() < .5 ? 'sun' : 'moon';
+    const names = HATCH_NAMES[type];
+    const name = names[S.hatched % names.length];
+    S.hatched++;
+    S.dragons.push({ id: 'd' + S.hatched, name, type, r, c, xp: 0 });
+    S.lastHatch = S.lastHatch ? S.lastHatch + '・' + name : name;
+  }
+  S.eggs = [];
+  rollWares();
 }
 
 // ---- 決戦 ----
@@ -697,29 +986,36 @@ async function startBattle() {
   $('battle').hidden = false;
   $('result').hidden = true;
   $('log').innerHTML = '';
-  $('bossHpMax').textContent = BOSS.hp;
-  $('battleSum').textContent = DRAGONS.map(d => `${d.name} Lv${level(S.xp[d.id])}`).join('・') + `　予想ダメージ ${predictedWith()}`;
-  let hp = BOSS.hp;
+  $('bossHpMax').textContent = BOSS_HP;
+  $('battleEyebrow').textContent = S.depth <= 0 ? `${S.day}日目の夜` : `${S.day}日目の夜・猶予が尽きた`;
+  const range = damageRange();
+  $('battleSum').textContent = S.dragons.map(d => `${d.name} Lv${level(d.xp)}`).join('・') + `　予想 ${range.min}〜${range.max}`;
+  const big = $('bossBig');
+  big.classList.remove('rise', 'hit');
+  void big.offsetWidth;
+  big.classList.add('rise');
+  let hp = BOSS_HP;
   setBossHp(hp);
-  await wait(900);
+  await wait(1500);
   outer:
   for (let round = 1; round <= ROUNDS; round++) {
     if (run !== battleRun) return;
     addLog(`${round}ラウンド目`, 'round');
-    for (const d of DRAGONS) {
-      await wait(450);
+    for (const d of S.dragons) {
+      await wait(420);
       if (run !== battleRun) return;
-      const dmg = Math.round(attackAt(d, S.xp[d.id]));
+      const crit = rand() < CRIT_RATE;
+      const dmg = Math.round(attackAt(d) * (crit ? CRIT_MULT : 1));
       hp = Math.max(0, hp - dmg);
-      addLog(`${d.name}の${d.breath}！ ${dmg}ダメージ${d.likes === BOSS.weak ? '（弱点）' : ''}`, d.likes);
+      const tags = [d.type === BOSS_WEAK ? '弱点' : '', crit ? '会心！' : ''].filter(Boolean).join('・');
+      addLog(`${d.name}のブレス！ ${dmg}ダメージ${tags ? `（${tags}）` : ''}`, d.type + (crit ? ' crit' : ''));
       setBossHp(hp);
-      const big = $('bossBig');
-      big.classList.remove('hit');
+      big.classList.remove('rise', 'hit');
       void big.offsetWidth;
       big.classList.add('hit');
       if (hp === 0) break outer;
     }
-    if (round < ROUNDS) { await wait(500); addLog('影の竜が咆哮した……', 'shade'); }
+    if (round < ROUNDS) { await wait(450); addLog(`影の竜が咆哮した……（残り${hp}）`, 'shade'); }
   }
   await wait(700);
   if (run !== battleRun) return;
@@ -729,13 +1025,13 @@ async function startBattle() {
   title.textContent = win ? '王国は守られた' : '王国は夜に包まれた';
   title.className = win ? 'win' : 'lose';
   $('resultText').textContent = win
-    ? '七日目の夜明け、影の竜は光の中に崩れて消えた。王国に朝が戻った。'
-    : `影の竜は残り体力${hp}で踏みとどまった。鏡を買い足したり、1本の光で2頭を照らしたりしてみよう。`;
+    ? `${S.day}日目の夜、影の竜は光の中に崩れて消えた。封じた裂け目は${S.sealedTotal}つ。王国に朝が戻った。`
+    : `影の竜は残り体力${hp}で踏みとどまった。裂け目を封じて時間を稼ぐか、1本の光で何頭も照らしてみよう。`;
   $('result').hidden = false;
   $('againBtn').focus();
 }
 function setBossHp(hp) {
-  $('bossBar').style.width = hp / BOSS.hp * 100 + '%';
+  $('bossBar').style.width = hp / BOSS_HP * 100 + '%';
   $('bossHpNow').textContent = hp;
 }
 function addLog(text, cls) {
@@ -748,24 +1044,30 @@ function addLog(text, cls) {
 
 function restart() {
   battleRun++;
-  S = freshState();
+  newGame(Date.now());
   S.screen = 'play';
   busy = false;
   $('battle').hidden = true;
   document.body.classList.remove('night', 'sunlit');
   render();
-  toast('1日目からやり直します');
+  toast('新しい庭で1日目から始めます');
 }
 
 // ---- 起動 ----
+let S;
 function start(data) {
-  if (data && data.S && typeof data.S.day === 'number') S = Object.assign(freshState(), data.S);
+  if (data && data.S && typeof data.S.day === 'number') S = data.S;
+  else newGame(Date.now());
   board.addEventListener('click', e => {
     const b = e.target.closest('button[data-r]');
     if (b) onCell(+b.dataset.r, +b.dataset.c);
   });
+  $('wares').addEventListener('click', e => {
+    const b = e.target.closest('button[data-i]');
+    if (b) buyWare(+b.dataset.i);
+  });
+  $('hint').addEventListener('click', e => { if (e.target.id === 'cancelEgg') cancelEgg(); });
   $('goBtn').addEventListener('click', advance);
-  $('buyBtn').addEventListener('click', buyMirror);
   $('againBtn').addEventListener('click', restart);
   $('helpBtn').addEventListener('click', () => {
     if (busy || S.screen === 'battle' || S.screen === 'end') return;
@@ -777,7 +1079,7 @@ function start(data) {
     S.screen = 'play';
     $('intro').hidden = true;
     render();
-    if (first) toast('太陽と月の光が交わるマスに、鏡を置いてみよう');
+    if (first) toast('光の行き止まりを裂け目にすると、影を押し戻せる', 3200);
   });
   $('intro').hidden = S.screen !== 'intro';
   render();
