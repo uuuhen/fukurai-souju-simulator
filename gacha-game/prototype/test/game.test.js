@@ -43,6 +43,7 @@ test("1回あたりの★5排出率から、単位ごとの確率に戻る", () 
   }
   const r = S.rarityRates(1000);
   assert.ok(Math.abs(r[1] + r[2] + r[3] + r[4] + r[5] - 1) < 1e-12);
+  assert.equal(r[4], 0.0046);
 });
 
 test("★5が1枚以上出る割合が単位ごとの確率に近い", () => {
@@ -90,16 +91,20 @@ test("かぶりは合成値になり、1000ごとにランクが上がる", () =
   assert.deepEqual(r.rankUps, [{ id: one.id, from: 1, to: 2 }]);
 
   for (let i = 0; i < 6; i += 1) pull(s, 10, pick(five));
-  // ★5 は1枚20。1枚目は入手、残り59枚で 1180 → ランク2・余り180
-  assert.deepEqual(s.cards[five.id], { copies: 60, points: 180, rank: 2 });
+  // ★5 は1枚23。1枚目は入手、残り59枚で 1357 → ランク2・余り357
+  assert.deepEqual(s.cards[five.id], { copies: 60, points: 357, rank: 2 });
 });
 
-test("ランク枠と能力の倍率", () => {
+test("ランク枠と能力の伸び方(ランク1は完成値の6〜8割、ランク10で完成)", () => {
   assert.deepEqual([1, 4, 5, 9, 10, 19, 20, 49, 50, 99, 100, 500].map(S.frameOf),
     ["素", "素", "銅", "銅", "銀", "銀", "金", "金", "虹", "虹", "神", "神"]);
-  assert.equal(S.statMultiplier(1), 1);
-  assert.ok(Math.abs(S.statMultiplier(10) - 1.27) < 1e-12);
-  assert.equal(S.statMultiplier(30), S.statMultiplier(10));
+  assert.equal(S.growth(1, 1), 0.6);
+  assert.equal(S.growth(5, 1), 0.79);
+  assert.ok(Math.abs(S.growth(1, 4) - 0.6 - 0.4 / 3) < 1e-12);
+  for (const r of [1, 2, 3, 4, 5]) {
+    assert.equal(S.growth(r, 10), 1);
+    assert.equal(S.growth(r, 30), 1); // ランク11以降は見た目と名誉だけ
+  }
 });
 
 test("無料枠は18秒に1回分回復し、9600で止まる", () => {

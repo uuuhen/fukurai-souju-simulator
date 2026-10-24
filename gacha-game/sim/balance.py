@@ -10,6 +10,7 @@ DESIGN.md に載せている数値はこのスクリプトの出力から取っ�
 
 import csv
 import itertools
+import math
 import random
 import sys
 from dataclasses import dataclass, field
@@ -22,15 +23,18 @@ CARDS_CSV = Path(__file__).resolve().parent.parent / "data" / "cards_season1.csv
 # 連の単位ごとの「★5 が1枚以上出る確率」。単位ごとに固定する。
 # 1回あたりに直すと 10連が一番高く、1000連が一番低い。
 UNIT_SSR = {10: 0.01, 100: 0.08, 1000: 0.50}
-# ★4以下は単位によらず1回あたりの排出率。★1 は残り全部
-LOWER_RATES = {4: 0.010, 3: 0.050, 2: 0.240}
+# ★4以下は単位によらず1回あたりの排出率。★1 は残り全部。
+# ★4 は「最大課金で2ヶ月たつと、全カードがランク10にそろう確率が約98%」になる値(report_growth 参照)
+LOWER_RATES = {4: 0.0046, 3: 0.050, 2: 0.240}
 
 PITY = 3000  # ★5 が出ないまま 3000回引いたら次の1回は★5確定
 
 # ランクアップに必要な合成値と、1枚あたりの合成値(レアリティ別)
 RANK_UP_POINTS = 1000
-SYNTH_POINTS = {1: 1, 2: 2, 3: 5, 4: 10, 5: 20}
+SYNTH_POINTS = {1: 1, 2: 2, 3: 5, 4: 10, 5: 23}
 STAT_RANK_CAP = 10  # 能力が伸びるのはランク10まで。それ以降は見た目と名誉のみ
+# ランク1の能力は、ランク10(完成値)の何割か。★が低いほど伸びしろが大きく、ランク10ではどのカードもほぼ並ぶ
+START_RATIO = {1: 0.60, 2: 0.64, 3: 0.68, 4: 0.73, 5: 0.79}
 
 # くじ枠
 FREE_PER_HOUR = 200
@@ -92,15 +96,25 @@ class Card:
     type: str
     attr: str
     rarity: int
-    hp: int
-    atk: int
+    hp_max: int  # ランク10での値(完成値)
+    atk_max: int
     skill: str
+
+    def stats(self, rank):
+        g = growth(self.rarity, rank)
+        return self.hp_max * g, self.atk_max * g
+
+
+def growth(rarity, rank):
+    """ランク rank での能力が完成値の何倍か。ランク1で START_RATIO、ランク10で1。"""
+    s = START_RATIO[rarity]
+    return s + (1 - s) * (min(rank, STAT_RANK_CAP) - 1) / (STAT_RANK_CAP - 1)
 
 
 def load_cards():
     with open(CARDS_CSV, encoding="utf-8") as f:
         return {row["name"]: Card(row["id"], row["name"], row["type"], row["attr"],
-                                  int(row["rarity"]), int(row["hp"]), int(row["atk"]), row["skill"])
+                                  int(row["rarity"]), int(row["hp_max"]), int(row["atk_max"]), row["skill"])
                 for row in csv.DictReader(f)}
 
 
@@ -108,24 +122,70 @@ def load_cards():
 
 FREE_PER_DAY = FREE_PER_HOUR * 24
 BOOST_PER_HOUR = sum(added for added, _ in boost_ladder())
+BOOST_YEN_PER_HOUR = 100 * len(boost_ladder())
+# 最大課金: 起きている16時間は毎時間の上限(1000回)まで上限突破し、寝ている8時間は無料枠、サブスクにも入る。
+# 霊符はいくらでも買えるので含めない。引き方はすべて1000連(★5が一番出にくい引き方)
+MAX_SPEND_PER_DAY = 16 * HOURLY_CAP + 8 * FREE_PER_HOUR + SUBSCRIPTION_PER_DAY
+SEASON_DAYS = 60  # 1期 = 2ヶ月
 PROFILES = {
     "無課金(2日に1回以上ログイン)": FREE_PER_DAY,
     "サブスク": FREE_PER_DAY + SUBSCRIPTION_PER_DAY,
-    f"重課金(サブスク+上限突破を1日4時間, {4 * 100 * len(boost_ladder())}円/日)":
+    f"重課金(サブスク+上限突破を1日4時間, {4 * BOOST_YEN_PER_HOUR:,}円/日)":
         FREE_PER_DAY + SUBSCRIPTION_PER_DAY + 4 * BOOST_PER_HOUR,
+    f"最大課金(サブスク+上限突破を1日16時間, {16 * BOOST_YEN_PER_HOUR:,}円/日)": MAX_SPEND_PER_DAY,
 }
+
+
+def copies_to_cap(rarity):
+    """ランク10(能力の上限)にするのに必要な枚数。1枚目で入手、残りが合成値になる。"""
+    return 1 + math.ceil((STAT_RANK_CAP - 1) * RANK_UP_POINTS / SYNTH_POINTS[rarity])
+
+
+def poisson_tail(lam, k):
+    """P(X >= k), X ~ Poisson(lam)。"""
+    below = 0.0
+    for i in range(k):
+        lp = -lam + i * math.log(lam) - math.lgamma(i + 1)
+        if lp > -745:
+            below += math.exp(lp)
+    return max(0.0, 1.0 - below)
+
+
+def completion(counts, draws, unit=1000):
+    """draws 回引いたとき、全カードがランク10にそろっている確率(レアリティ別と全体)。"""
+    r = rates(unit)
+    per = {k: poisson_tail(draws * r[k] / counts[k], copies_to_cap(k)) ** counts[k] for k in counts}
+    return math.prod(per.values()), per
+
+
+def completion_monte_carlo(counts, draws, trials=2000, seed=1, unit=1000):
+    """completion() の確認用。各カードの枚数を多項分布で引いて数える。"""
+    rng = random.Random(seed)
+    r = rates(unit)
+    cards = [(k, r[k] / counts[k]) for k in counts for _ in range(counts[k])]
+    ok = 0
+    for _ in range(trials):
+        left, p_left, done = draws, 1.0, True
+        for k, p in cards:
+            x = rng.binomialvariate(left, min(1.0, p / p_left)) if left > 0 else 0
+            left -= x
+            p_left -= p
+            done = done and x >= copies_to_cap(k)
+        ok += done
+    return ok / trials
 
 
 def report_growth(cards):
     counts = {r: sum(1 for c in cards.values() if c.rarity == r) for r in range(1, 6)}
+    w = 52
     print("== 育成: 1日に引ける回数 ==")
     for name, n in PROFILES.items():
-        print(f"  {name:<44} {n:>6,} 回/日"
+        print(f"  {name:<{w}} {n:>6,} 回/日"
               + "".join(f"  {unit}連なら{n // unit:>4}回" for unit in UNIT_SSR))
 
     print(f"\n== 特定の1枚をランク+1するまでの日数 (第1期 {len(cards)}種) ==")
     print("  [合成値: " + " ".join(f"★{r}={SYNTH_POINTS[r]}" for r in sorted(SYNTH_POINTS)) + "]")
-    print("  " + " " * 44 + "".join(f"{'★' + str(r):>7}" for r in range(1, 5))
+    print("  " + " " * w + "".join(f"{'★' + str(r):>7}" for r in range(1, 5))
           + "".join(f"{'★5(' + str(u) + '連)':>11}" for u in UNIT_SSR))
 
     def days(rate, rarity, n):
@@ -134,8 +194,17 @@ def report_growth(cards):
     for name, n in PROFILES.items():
         lower = [days(rates(1000)[r], r, n) for r in range(1, 5)]
         top = [days(ssr_rate(u), 5, n) for u in UNIT_SSR]
-        print(f"  {name:<44}" + "".join(f"{d:>7.1f}" for d in lower) + "".join(f"{d:>11.1f}" for d in top))
+        print(f"  {name:<{w}}" + "".join(f"{d:>7.1f}" for d in lower) + "".join(f"{d:>11.1f}" for d in top))
     print("  (★1-★4 は単位による差がほぼない。ランク10 = ランクアップ9回分)")
+
+    print(f"\n== 最大課金で全{len(cards)}種がランク10にそろう確率 ({MAX_SPEND_PER_DAY:,}回/日, すべて1000連) ==")
+    print("  ランク10に必要な枚数: " + " ".join(f"★{r} {copies_to_cap(r):,}枚" for r in range(1, 6)))
+    for d in (50, 55, 58, 60, 62, 65):
+        total, per = completion(counts, MAX_SPEND_PER_DAY * d)
+        print(f"  {d:>3}日目: {total:6.1%}   " + " ".join(f"★{r} {per[r]:6.1%}" for r in range(1, 6)))
+    mc = completion_monte_carlo(counts, MAX_SPEND_PER_DAY * SEASON_DAYS)
+    print(f"  {SEASON_DAYS}日目を多項分布で2000回引いて確かめた値: {mc:.1%}")
+    print(f"  {SEASON_DAYS}日間の支払い: 上限突破 {SEASON_DAYS * 16 * BOOST_YEN_PER_HOUR:,}円 + サブスク")
 
     print("\n== 図鑑: 第1期の全52種がそろうまで (無課金, すべて1000連) ==")
     n, r = PROFILES["無課金(2日に1回以上ログイン)"], rates(1000)
@@ -151,7 +220,6 @@ ADVANTAGE, DISADVANTAGE = 1.1, 0.92
 MAX_ROUNDS = 20
 DMG_SPREAD = 0.3  # ダメージの乱数幅 (0.3 なら ±30%)。格下にも勝ち目を残すため大きめ
 CRIT_RATE, CRIT_MULT = 0.2, 1.5  # 会心
-RANK_STEP = 0.03  # ランク1つにつき体・攻 +3%
 RESONANCE = 1.5  # 霊獣・霊具が精霊と同じ属性なら補正値 x1.5
 
 
@@ -161,10 +229,6 @@ def affinity(att, dfn):
     if BEATS[dfn] == att and att not in "光闇":
         return DISADVANTAGE
     return 1.0
-
-
-def rank_mult(rank):
-    return 1.0 + RANK_STEP * (min(rank, STAT_RANK_CAP) - 1)
 
 
 @dataclass
@@ -179,15 +243,15 @@ class Unit:
     skills: set = field(default_factory=set)
 
     def __post_init__(self):
-        m = rank_mult(self.rank)
-        self.hp, self.atk = self.spirit.hp * m, self.spirit.atk * m
+        self.hp, self.atk = self.spirit.stats(self.rank)
         self.skills = {self.spirit.skill} - {""}
         for gear in (self.beast, self.tool):
             if gear is None:
                 continue
             resonance = RESONANCE if gear.attr == self.spirit.attr else 1.0
-            self.hp += gear.hp * m * resonance
-            self.atk += gear.atk * m * resonance
+            hp, atk = gear.stats(self.rank)
+            self.hp += hp * resonance
+            self.atk += atk * resonance
             if gear.skill:
                 self.skills.add(gear.skill)
 
@@ -292,45 +356,49 @@ def report_battle(cards):
     }
     spirits = {(s.attr, s.rarity): s for s in c.values() if s.type == "精霊"}
 
-    def std(attr, rarity, rank=1):
+    def std(attr, rarity, rank):
         return Unit(spirits[(attr, rarity)], *gear[attr], rank=rank)
 
     def pct(xs):
         return "".join(f"{x:>7.0%}" for x in xs)
 
-    print(f"== 対戦: 属性相性 (有利 x{ADVANTAGE} / 不利 x{DISADVANTAGE}, 標準の付与, ランク1) ==")
-    print("  同じ★どうしの勝率。行が自分、列が相手")
+    print("== 能力の伸び方: ランク1の能力は完成値(ランク10)の何割か ==")
+    print("  " + " / ".join(f"★{r} {START_RATIO[r]:.0%}" for r in range(1, 6)))
+
+    print(f"\n== 対戦: 属性相性 (有利 x{ADVANTAGE} / 不利 x{DISADVANTAGE}, 同じ★・ランク10どうし) ==")
+    print("  行が自分、列が相手")
     for k in (1, 4):
         print(f"  ★{k}       " + "".join(f"{'vs' + a:>6}" for a in "土火水雷"))
         for a in "土火水雷":
-            print(f"    {a}     " + pct(winrate(std(a, k), std(b, k), n=2000) for b in "土火水雷"))
+            print(f"    {a}     " + pct(winrate(std(a, k, 10), std(b, k, 10), n=2000) for b in "土火水雷"))
 
-    print("\n== 対戦: ★の差 (ランク1) ==")
-    print("  水★i vs 土★j (相性なし)      " + "".join(f"{'土★' + str(j):>6}" for j in range(1, 5)))
-    for i in range(1, 5):
-        print(f"    水★{i}                     " + pct(winrate(std("水", i), std("土", j)) for j in range(1, 5)))
-    print("  水★i vs 火★j (水が有利)      " + "".join(f"{'火★' + str(j):>6}" for j in range(1, 5)))
-    for i in range(1, 5):
-        print(f"    水★{i}                     " + pct(winrate(std("水", i), std("火", j)) for j in range(1, 5)))
+    for rank, note in ((1, "序盤は★の差が大きい"), (10, "ランク10ではほぼ並ぶ")):
+        print(f"\n== 対戦: ★の差 (ランク{rank}どうし, 相性なし: 水★i vs 土★j) ... {note} ==")
+        print("        " + "".join(f"{'土★' + str(j):>6}" for j in range(1, 5)))
+        for i in range(1, 5):
+            print(f"    水★{i}" + pct(winrate(std("水", i, rank), std("土", j, rank)) for j in range(1, 5)))
 
-    print("\n== 対戦: ランク (水どうし) ==")
-    for rank in (4, 7, 10):
-        same = winrate(std("水", 2, rank), std("水", 2))
-        print(f"  ★2 R{rank:<2} vs ★2 R1: {same:.0%}   "
-              f"★1 R{rank:<2} vs ★2/★3/★4 R1: "
-              + " / ".join(f"{winrate(std('水', 1, rank), std('水', j)):.0%}" for j in range(2, 5)))
+    print("\n== 対戦: ランク (同じカードのランク1と比べる) ==")
+    for name, attr, rarity in (("雫(★1)", "水", 1), ("光輪天女(★5)", "光", 5)):
+        print(f"  {name}: " + " / ".join(
+            f"R{k} {winrate(std(attr, rarity, k), std(attr, rarity, 1)):.0%}" for k in (4, 7, 10)))
+    print(f"  雫(★1) R10 vs 海神(★4) R1: {winrate(std('水', 1, 10), std('水', 4, 1)):.0%}"
+          f"   雫(★1) R10 vs 光輪天女(★5) R1: {winrate(std('水', 1, 10), std('光', 5, 1)):.0%}")
 
-    print("\n== 対戦: ★5 (ランク1) ==")
+    print("\n== 対戦: ★5 (ランク10どうし) ==")
     for five in ("光", "闇"):
-        print(f"  {spirits[(five, 5)].name} vs ★4 土/火/水/雷: "
-              + " / ".join(f"{winrate(std(five, 5), std(a, 4)):.0%}" for a in "土火水雷"))
-    print(f"  光輪天女 vs 黄泉津姫: {winrate(std('光', 5), std('闇', 5)):.0%}")
+        name = spirits[(five, 5)].name
+        print(f"  {name} vs ★4 土/火/水/雷: "
+              + " / ".join(f"{winrate(std(five, 5, 10), std(a, 4, 10)):.0%}" for a in "土火水雷")
+              + "   vs ★1 土/火/水/雷: "
+              + " / ".join(f"{winrate(std(five, 5, 10), std(a, 1, 10)):.0%}" for a in "土火水雷"))
+    print(f"  光輪天女 vs 黄泉津姫: {winrate(std('光', 5, 10), std('闇', 5, 10)):.0%}")
 
-    print("\n== 対戦: 霊獣・霊具 (海神 R1 vs 標準の付与をした海神 R1) ==")
-    for label, unit in (("付与なし", Unit(c["海神"])),
-                        ("同じ★で属性違い(火)", Unit(c["海神"], c["炎狐"], c["焔扇"])),
-                        ("★3の水の付与(蛟+潮満玉)", Unit(c["海神"], c["蛟"], c["潮満玉"]))):
-        print(f"  {label:<20} {winrate(unit, std('水', 4)):.0%}")
+    print("\n== 対戦: 霊獣・霊具 (海神 R10 vs 標準の付与をした海神 R10) ==")
+    for label, unit in (("付与なし", Unit(c["海神"], rank=10)),
+                        ("属性違い(火)の付与", Unit(c["海神"], c["炎狐"], c["焔扇"], rank=10)),
+                        ("★3の水の付与(蛟+潮満玉)", Unit(c["海神"], c["蛟"], c["潮満玉"], rank=10))):
+        print(f"  {label:<20} {winrate(unit, std('水', 4, 10)):.0%}")
 
     print("\n== 対戦: 三番勝負 (先鋒・中堅・大将の2本先取) ==")
     deck_a = [(c["霧姫"], c["蛟"], c["潮満玉"]), (c["炎舞姫"], c["炎狐"], c["焔扇"]),
@@ -353,13 +421,10 @@ def report_battle(cards):
     print("  並び順がお互いランダムのときの、左側の勝率")
     for (na, da, ra), (nb, db, rb) in ((("A", deck_a, 4), ("B", deck_b, 4)),
                                        (("A", deck_a, 10), ("B", deck_b, 4)),
-                                       (("A", deck_a, 10), ("B", deck_b, 7)),
                                        (("A", deck_a, 10), ("B", deck_b, 10)),
-                                       (("C", deck_c, 7), ("B", deck_b, 10)),
                                        (("C", deck_c, 10), ("B", deck_b, 10))):
         print(f"    {na} R{ra:<2} vs {nb} R{rb:<2}: {team_winrate(deck(da, ra), deck(db, rb)):.0%}")
-    for rc in (7, 10):
-        print(f"  C R{rc} が B R10 の並び順を読み切った場合: {read_winrate(deck(deck_c, rc), deck(deck_b, 10)):.0%}")
+    print(f"  C R10 が B R10 の並び順を読み切った場合: {read_winrate(deck(deck_c, 10), deck(deck_b, 10)):.0%}")
 
 
 def main():

@@ -11,14 +11,16 @@
   // ------------------------------------------------------------ くじ
   const UNITS = [10, 100, 1000];
   const UNIT_SSR = { 10: 0.01, 100: 0.08, 1000: 0.5 }; // ★5が1枚以上出る確率(単位ごとに固定)
-  const LOWER_RATES = { 4: 0.01, 3: 0.05, 2: 0.24 }; // 単位によらず1回あたり。★1は残り
+  // 単位によらず1回あたり。★1は残り。★4は「最大課金で2ヶ月たつと全カードがランク10にそろう確率が約98%」になる値
+  const LOWER_RATES = { 4: 0.0046, 3: 0.05, 2: 0.24 };
   const PITY = 3000; // ★5が出ないまま3000回引いたら次の1回は★5
 
   // ------------------------------------------------------------ 合成
-  const SYNTH_POINTS = { 1: 1, 2: 2, 3: 5, 4: 10, 5: 20 };
+  const SYNTH_POINTS = { 1: 1, 2: 2, 3: 5, 4: 10, 5: 23 };
   const RANK_UP_POINTS = 1000;
   const STAT_RANK_CAP = 10;
-  const RANK_STEP = 0.03;
+  // ランク1の能力は、ランク10(完成値)の何割か。★が低いほど伸びしろが大きく、ランク10ではどのカードもほぼ並ぶ
+  const START_RATIO = { 1: 0.6, 2: 0.64, 3: 0.68, 4: 0.73, 5: 0.79 };
   const FRAMES = [
     { from: 100, name: "神" },
     { from: 50, name: "虹" },
@@ -53,7 +55,7 @@
       const row = Object.fromEntries(line.split(",").map((v, i) => [keys[i], v]));
       return {
         id: row.id, name: row.name, kana: row.kana, type: row.type, attr: row.attr,
-        rarity: Number(row.rarity), hp: Number(row.hp), atk: Number(row.atk), skill: row.skill,
+        rarity: Number(row.rarity), hpMax: Number(row.hp_max), atkMax: Number(row.atk_max), skill: row.skill,
       };
     });
   }
@@ -93,8 +95,10 @@
     return FRAMES.find((f) => rank >= f.from).name;
   }
 
-  function statMultiplier(rank) {
-    return 1 + RANK_STEP * (Math.min(rank, STAT_RANK_CAP) - 1);
+  /** ランク rank での能力が完成値(ランク10)の何倍か。 */
+  function growth(rarity, rank) {
+    const s = START_RATIO[rarity];
+    return s + (1 - s) * (Math.min(rank, STAT_RANK_CAP) - 1) / (STAT_RANK_CAP - 1);
   }
 
   function dayKey(t) {
@@ -382,10 +386,10 @@
   }
 
   return {
-    UNITS, UNIT_SSR, LOWER_RATES, PITY, SYNTH_POINTS, RANK_UP_POINTS, STAT_RANK_CAP,
+    UNITS, UNIT_SSR, LOWER_RATES, PITY, SYNTH_POINTS, RANK_UP_POINTS, STAT_RANK_CAP, START_RATIO,
     HOUR, DAY, FREE_PER_HOUR, FREE_CAP, REGEN_MS, HOURLY_CAP, BOOST_STEPS, BOOST_PRICE, BOOST_WINDOW,
     SUB_PER_DAY, REIFU_PACK, REIFU_PRICE, REIFU_CAP, REIFU_MONTHS, SHELF_SLOTS,
-    parseCards, indexCards, ssrRate, rarityRates, frameOf, statMultiplier, addMonths, dayKey,
+    parseCards, indexCards, ssrRate, rarityRates, frameOf, growth, addMonths, dayKey,
     newState, restore, sync, nextFreeIn, wakuAvailable, reifuAvailable, available,
     nextBoost, buyBoost, canBuyReifu, buyReifu, setSubscription,
     draw, simulateDays, setShelf, honors,

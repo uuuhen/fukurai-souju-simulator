@@ -329,14 +329,15 @@
       rows.push(["ランク", `R${owned.rank}（${frame}枠）${nextFrame ? ` · 次の枠は R${nextFrame}` : ""}`]);
       rows.push(["合成値", `${fmt(owned.points)} / ${fmt(S.RANK_UP_POINTS)} · 1枚 ${S.SYNTH_POINTS[card.rarity]}`]);
       rows.push(["持っている枚数", `${fmt(owned.copies)}枚`]);
-      const m = S.statMultiplier(owned.rank);
-      const cap = owned.rank >= S.STAT_RANK_CAP ? "（上限）" : "";
+      const g = S.growth(card.rarity, owned.rank);
+      const done = owned.rank >= S.STAT_RANK_CAP ? "完成" : `完成値の${Math.round(g * 100)}%`;
+      const statText = (hp, atk, plus) => [hp ? `体${plus}${fmt(hp)}` : "", atk ? `攻${plus}${fmt(atk)}` : ""].filter(Boolean).join(" · ");
       if (card.type === "精霊") {
-        rows.push(["能力", `体 ${fmt(card.hp * m)} · 攻 ${fmt(card.atk * m)}（×${m.toFixed(2)}${cap}）`]);
+        rows.push(["能力", `${statText(card.hpMax * g, card.atkMax * g, " ")}（${done}）`]);
       } else {
-        const parts = [card.hp ? `体+${fmt(card.hp * m)}` : "", card.atk ? `攻+${fmt(card.atk * m)}` : ""].filter(Boolean).join(" · ");
-        rows.push(["付与すると", `${parts}（同じ属性の精霊なら×1.5）`]);
+        rows.push(["付与すると", `${statText(card.hpMax * g, card.atkMax * g, "+")}（${done}。同じ属性の精霊なら×1.5）`]);
       }
+      if (owned.rank < S.STAT_RANK_CAP) rows.push(["ランク10で", statText(card.hpMax, card.atkMax, card.type === "精霊" ? " " : "+")]);
       const here = state.shelf.indexOf(sheetId);
       const slots = state.shelf.map((sid, i) => `<button type="button" data-slot="${i}" aria-pressed="${sid === sheetId}">` +
         `${i + 1}: ${sid ? esc(cards.byId[sid].name) : "空き"}</button>`).join("");
