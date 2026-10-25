@@ -149,7 +149,7 @@
       const btn = $(`unit-${unit}`);
       const cooling = unit === 10 && Date.now() < tenReadyAt;
       btn.disabled = busy || cooling || have < unit;
-      $(`unit-${unit}-s`).textContent = have < unit ? `あと${fmt(unit - have)}回分` : `1回あたり ${(S.ssrRate(unit) * 100).toFixed(4)}%`;
+      $(`unit-${unit}-s`).textContent = have < unit ? `あと${fmt(unit - have)}回分` : `1回あたり ${(S.ssrRate(unit) * 100).toFixed(5)}%`;
     }
     $("pity").textContent = fmt(S.PITY - state.pity);
 
@@ -176,14 +176,20 @@
     }
   }
 
+  function pctLabel(p) {
+    return `${Number((p * 100).toPrecision(2))}%`; // 0.0005 → 0.05%, 0.03 → 3%
+  }
+
   function renderOdds() {
+    for (const unit of S.UNITS) $(`unit-${unit}-p`).textContent = `★5 ${pctLabel(S.UNIT_SSR[unit])}`;
+    $("pity-note").textContent = `★5が出ないまま${fmt(S.PITY)}回引くと、次の1回は★5`;
     const head = S.UNITS.map((u) => `<th>${u}連</th>`).join("");
     const rows = [
-      ["★5が1枚以上", (u) => `${S.UNIT_SSR[u] * 100}%`],
-      ["★5（1回あたり）", (u) => `${(S.ssrRate(u) * 100).toFixed(4)}%`],
+      ["★5が1枚以上", (u) => pctLabel(S.UNIT_SSR[u])],
+      ["★5（1回あたり）", (u) => `${(S.ssrRate(u) * 100).toFixed(5)}%`],
     ];
     for (const r of [4, 3, 2, 1]) rows.push([`★${r}（1回あたり）`, (u) => `${(S.rarityRates(u)[r] * 100).toFixed(2)}%`]);
-    rows.push(["★5 1種あたり", (u) => `${(S.ssrRate(u) / cards.byRarity[5].length * 100).toFixed(4)}%`]);
+    rows.push(["★5 1種あたり", (u) => `${(S.ssrRate(u) / cards.byRarity[5].length * 100).toFixed(5)}%`]);
     for (const r of [4, 3, 2, 1]) rows.push([`★${r} 1種あたり`, (u) => `${(S.rarityRates(u)[r] / cards.byRarity[r].length * 100).toFixed(3)}%`]);
     $("odds").innerHTML = `<table><thead><tr><th>第1期（${cards.list.length}種）</th>${head}</tr></thead><tbody>` +
       rows.map(([label, f]) => `<tr><td>${label}</td>${S.UNITS.map((u) => `<td>${f(u)}</td>`).join("")}</tr>`).join("") +

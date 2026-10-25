@@ -48,7 +48,7 @@ test("1回あたりの★5排出率から、単位ごとの確率に戻る", () 
 
 test("★5が1枚以上出る割合が単位ごとの確率に近い", () => {
   const rng = seeded(7);
-  for (const [unit, trials, tolerance] of [[1000, 3000, 0.03], [100, 6000, 0.01], [10, 30000, 0.002]]) {
+  for (const [unit, trials, tolerance] of [[1000, 6000, 0.01], [100, 20000, 0.002], [10, 60000, 0.0004]]) {
     const s = S.newState(T0);
     let hit = 0;
     for (let i = 0; i < trials; i += 1) {
@@ -60,11 +60,12 @@ test("★5が1枚以上出る割合が単位ごとの確率に近い", () => {
   }
 });
 
-test("★5が出ないまま3000回引くと、次の1回が★5になる", () => {
+test("★5が出ないまま70,000回引くと、次の1回が★5になる", () => {
   const s = S.newState(T0);
   const never = () => 0.999; // ★5 にならない乱数
-  for (let i = 0; i < 300; i += 1) pull(s, 10, never);
-  assert.equal(s.pity, 3000);
+  assert.equal(S.PITY, 70000);
+  for (let i = 0; i < S.PITY / 10; i += 1) pull(s, 10, never);
+  assert.equal(s.pity, S.PITY);
   const r = pull(s, 10, never);
   assert.equal(r.counts[5], 1);
   assert.equal(r.pityHit, true);
@@ -90,9 +91,11 @@ test("かぶりは合成値になり、1000ごとにランクが上がる", () =
   assert.deepEqual(s.cards[one.id], { copies: 1010, points: 9, rank: 2 });
   assert.deepEqual(r.rankUps, [{ id: one.id, from: 1, to: 2 }]);
 
-  for (let i = 0; i < 6; i += 1) pull(s, 10, pick(five));
-  // ★5 は1枚23。1枚目は入手、残り59枚で 1357 → ランク2・余り357
-  assert.deepEqual(s.cards[five.id], { copies: 60, points: 357, rank: 2 });
+  // ★5 は1枚1000。1枚目で入手、残り9枚でランク10
+  pull(s, 10, pick(five));
+  assert.deepEqual(s.cards[five.id], { copies: 10, points: 0, rank: 10 });
+  for (let i = 0; i < 5; i += 1) pull(s, 10, pick(five));
+  assert.deepEqual(s.cards[five.id], { copies: 60, points: 0, rank: 60 });
 });
 
 test("ランク枠と能力の伸び方(ランク1は完成値の6〜8割、ランク10で完成)", () => {

@@ -445,11 +445,11 @@ div.card { cursor: default; }
           <button type="button" role="radio" data-source="reifu" aria-checked="false">霊符で引く<b id="src-reifu">0</b></button>
         </div>
         <div class="units">
-          <button type="button" class="unit" data-unit="10" id="unit-10"><span class="u-n">10連</span><span class="u-p">★5 1%</span><span class="u-s" id="unit-10-s"></span><span class="cool"></span></button>
-          <button type="button" class="unit" data-unit="100" id="unit-100"><span class="u-n">100連</span><span class="u-p">★5 8%</span><span class="u-s" id="unit-100-s"></span><span class="cool"></span></button>
-          <button type="button" class="unit" data-unit="1000" id="unit-1000"><span class="u-n">1000連</span><span class="u-p">★5 50%</span><span class="u-s" id="unit-1000-s"></span><span class="cool"></span></button>
+          <button type="button" class="unit" data-unit="10" id="unit-10"><span class="u-n">10連</span><span class="u-p" id="unit-10-p"></span><span class="u-s" id="unit-10-s"></span><span class="cool"></span></button>
+          <button type="button" class="unit" data-unit="100" id="unit-100"><span class="u-n">100連</span><span class="u-p" id="unit-100-p"></span><span class="u-s" id="unit-100-s"></span><span class="cool"></span></button>
+          <button type="button" class="unit" data-unit="1000" id="unit-1000"><span class="u-n">1000連</span><span class="u-p" id="unit-1000-p"></span><span class="u-s" id="unit-1000-s"></span><span class="cool"></span></button>
         </div>
-        <div class="pity"><span>天井まで あと <strong id="pity">3,000</strong>回</span><span>★5が出ないまま3,000回引くと、次の1回は★5</span></div>
+        <div class="pity"><span>天井まで あと <strong id="pity"></strong>回</span><span id="pity-note"></span></div>
         <details class="odds">
           <summary>排出率の詳細</summary>
           <div class="table-wrap" id="odds"></div>
