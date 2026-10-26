@@ -142,7 +142,6 @@ button.cell:focus-visible { outline: 2px solid var(--text); outline-offset: -2px
   left: calc(100% * .6 / 8.2); right: calc(100% * .6 / 8.2); top: calc(100% * .3 / 7.9); bottom: calc(100% * .6 / 7.9);
 }
 .board-wrap[data-phase="morning"] .veil.sunv { background: radial-gradient(circle at 100% 50%, rgba(255, 200, 110, .32), transparent 70%); opacity: 1; }
-.board-wrap[data-phase="noon"] .veil.sunv { background: radial-gradient(circle at 50% 100%, rgba(255, 220, 140, .3), transparent 75%); opacity: 1; }
 .board-wrap[data-phase="evening"] .veil.sunv { background: radial-gradient(circle at 0% 50%, rgba(255, 140, 70, .34), transparent 70%); opacity: 1; }
 body.night .veil.nightv { background: rgba(16, 24, 70, .55); opacity: 1; }
 .quake { animation: quake .5s ease; }
@@ -399,6 +398,14 @@ body.night .actionbar { background: linear-gradient(180deg, transparent, var(--g
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
 }
+.banner { margin: 0; padding: 7px 10px; border-radius: 8px; font-size: 13px; }
+.banner.bad { background: rgba(255, 154, 138, .12); border: 1px solid rgba(255, 154, 138, .4); color: #ffd0c8; }
+.banner.good { background: rgba(184, 219, 255, .12); border: 1px solid rgba(184, 219, 255, .4); color: #e4f1ff; }
+#banners { display: grid; gap: 6px; }
+#banners:empty { display: none; }
+.ware.picked { background: rgba(255, 201, 77, .16); border-color: var(--honey); box-shadow: inset 0 0 0 1px var(--honey); }
+.float.chain { color: #fff6c8; font-size: calc(100cqw * .036); }
+.chainword { color: #fff1a8; }
 </style>
 
 <main class="app">
@@ -428,7 +435,6 @@ body.night .actionbar { background: linear-gradient(180deg, transparent, var(--g
         </filter>
         <linearGradient id="shaft-sun-E" x1="1" y1="0" x2="0" y2="0"><stop offset="0" stop-color="#ffd27a" stop-opacity=".55"></stop><stop offset="1" stop-color="#ffd27a" stop-opacity="0"></stop></linearGradient>
         <linearGradient id="shaft-sun-W" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#ffb46a" stop-opacity=".55"></stop><stop offset="1" stop-color="#ffb46a" stop-opacity="0"></stop></linearGradient>
-        <linearGradient id="shaft-sun-S" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#ffe2a0" stop-opacity=".55"></stop><stop offset="1" stop-color="#ffe2a0" stop-opacity="0"></stop></linearGradient>
         <linearGradient id="shaft-moon-E" x1="1" y1="0" x2="0" y2="0"><stop offset="0" stop-color="#cfe6ff" stop-opacity=".45"></stop><stop offset="1" stop-color="#cfe6ff" stop-opacity="0"></stop></linearGradient>
         <linearGradient id="shaft-moon-W" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#cfe6ff" stop-opacity=".45"></stop><stop offset="1" stop-color="#cfe6ff" stop-opacity="0"></stop></linearGradient>
         <linearGradient id="shaft-moon-S" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#cfe6ff" stop-opacity=".45"></stop><stop offset="1" stop-color="#cfe6ff" stop-opacity="0"></stop></linearGradient>
@@ -439,18 +445,19 @@ body.night .actionbar { background: linear-gradient(180deg, transparent, var(--g
     <div class="floats" id="floats"></div>
   </div>
 
-  <!-- 市の場面 -->
+  <!-- 市の場面（2日目から） -->
   <section class="panel" id="marketPanel" aria-label="朝の市">
-    <div class="panel-head"><strong>朝の市</strong><span>蜜 <b id="honey">0</b></span></div>
+    <div class="panel-head"><strong>朝の市</strong><span>使える蜜 <b id="honey">0</b></span></div>
     <div class="wares" id="wares"></div>
     <p class="line" id="marketInfo"></p>
   </section>
 
   <!-- 鏡の場面 -->
   <section class="panel" id="gardenPanel" aria-label="鏡を置く" hidden>
+    <div id="banners"></div>
     <div class="tray" id="tray"></div>
+    <p class="line" id="gardenChain"></p>
     <div class="dragons" id="dragons"></div>
-    <p class="line" id="gardenHoney"></p>
     <p class="line" id="gardenShade"></p>
     <p class="line" id="gardenOdds"></p>
   </section>
@@ -459,31 +466,29 @@ body.night .actionbar { background: linear-gradient(180deg, transparent, var(--g
   <section class="panel" id="lightPanel" aria-label="光を通す" hidden>
     <div class="under">
       <div class="strata"><div class="shade-icon" id="shadeIcon"><i></i><i></i></div></div>
-      <div class="under-info"><strong>影の竜</strong><span id="depthText"></span><span class="line" id="riseNote"></span></div>
+      <div class="under-info"><strong>影の竜</strong><span id="depthText"></span></div>
     </div>
     <ol class="report" id="report" aria-live="polite"></ol>
   </section>
 
   <div class="actionbar">
-    <div class="actions">
-      <button type="button" class="secondary" id="backBtn" hidden>← 市へ</button>
-      <button type="button" class="primary" id="mainBtn"></button>
-    </div>
+    <button type="button" class="primary" id="mainBtn"></button>
     <p class="hint" id="hint"></p>
   </div>
 </main>
 
 <div class="overlay" id="intro">
   <div class="sheet">
-    <p class="eyebrow">試作品 v0.4</p>
+    <p class="eyebrow">試作品 v0.5</p>
     <h2>竜と七日の庭</h2>
     <p class="story">王宮の地の底で、影の竜が目を覚ましつつある。地上に出れば王国は闇に沈む。飼育係のあなたに託されたのは、まだ幼い二頭の竜と、城壁に囲まれた小さな庭だけ。</p>
     <ul class="howto">
-      <li>1日は<b>「市 → 鏡 → 光」</b>の3つの場面で進みます。市で蜜を払って道具を買い、庭に鏡を置き、光を通します。</li>
-      <li>光は城壁の窓から差し込みます。<b class="sun-t">朝日は東（右）、昼の日差しは南（下）、夕日は西（左）</b>。<b class="moon-t">月</b>は日ごとに西→南→東へ移りながら満ちていきます。最初は朝日だけで、ステージが進むと差す光が増えます。</li>
-      <li>光が通った<b>竜</b>が育ちます。好きな光なら+3、そうでなければ+1。1本の光で何頭も照らすと、2頭目から1頭につき全員に+2。</li>
-      <li>庭の<b>花</b>は光で咲き、蜜がとれます。<b class="sun-t">日向花</b>は日の光、<b class="moon-t">月見草</b>は月の光で咲きます。蜜は市で使うお金です。</li>
-      <li>影の竜は毎晩上がってきて（ステージ1は8m、2は10m、3からは12m）、<b>裂け目</b>1つにつき5m速くなります。<b>光の行き止まりを裂け目にすると封じられ</b>、3m押し戻せます。</li>
+      <li>1日は<b>「市 → 鏡 → 光」</b>の場面で進みます（1日目は市なし）。市で蜜を払って道具を選び、庭に鏡を置き、光を通します。</li>
+      <li>光は城壁の窓から差し込みます。<b class="sun-t">朝日は東（右）、夕日は西（左）</b>。昼は日が高く、窓からは差し込みません。<b class="moon-t">月</b>は日ごとに西→南→東へ移りながら満ちていきます。最初は朝日だけで、ステージが進むと夕日と月が加わります（最大3本）。</li>
+      <li>光が<b>竜</b>に当たると育ちます（好きな光なら+3、そうでなければ+1）。<b>花</b>は日向花なら日の光、月見草なら月の光で咲き、蜜（市のお金）がとれます。</li>
+      <li><b>連鎖</b>: 1本の光が竜や咲く花に続けて当たるほど、2つ目は+1、3つ目は+2……と成長と蜜が増えます。鏡で光を曲げて、たくさん続けて当てましょう。</li>
+      <li>影の竜は毎晩上がってきて、<b>裂け目</b>1つにつき5m速くなります。<b>光の行き止まりを裂け目にすると封じられ</b>、3m押し戻せます。</li>
+      <li>天気は2つ。<b>朝霧</b>の日は朝日が、<b>夕立</b>の日は夕日が差しません。明日の天気は、光の場面の最後に予報が出ます。</li>
       <li>市と鏡の場面には<b>持ち時間</b>があります。過ぎると1秒ごとに影が上がります。早く光を通すと、残り10秒ごとに蜜が1つもらえます。</li>
       <li>鏡は1日の終わりに手元へ戻ります。毎日、その日の光に合わせて置き直します。</li>
       <li>影の竜が地上に出たら決戦。勝つと<b>竜は育ったまま</b>次のステージへ（負けたら、そのステージを始めたときの竜に戻ってやり直し）。</li>
@@ -525,7 +530,7 @@ body.night .actionbar { background: linear-gradient(180deg, transparent, var(--g
       <p class="note" id="recordText"></p>
       <button type="button" class="primary" id="nextBtn"></button>
       <button type="button" class="secondary" id="restartBtn">ステージ1から始め直す</button>
-      <p class="note">試作品 v0.4。難しさや楽しさの感想をチャットで送ってください。</p>
+      <p class="note">試作品 v0.5。難しさや楽しさの感想をチャットで送ってください。</p>
     </div>
   </div>
 </div>
@@ -543,65 +548,64 @@ const START_DEPTH = 70;         // 影の竜の最初の深さ(m)
 const DEPTH_CAP = 80;
 const RISE_PER_CRACK = 5;       // 開いた裂け目1つにつき追加で上がる
 const SEAL_PUSH = 3;            // 裂け目を封じると押し戻す深さ
+const MAX_CRACKS = 5;           // 同時に開いている裂け目の上限（盤面が見づらくならないように）
 const START_MIRRORS = 3;
 const MAX_MIRRORS = 6;
 const START_HONEY = 3;
 const MAX_DRAGONS = 4;          // 卵を含む
 const MAX_FLOWERS = 6;
+const START_FLOWERS = 3;
 const GAIN_LIKED = 3;           // 好きな光の成長
 const GAIN_OTHER = 1;           // 好きではない光の成長
-const CHAIN_BONUS = 2;          // 1本の光で照らした2頭目以降1頭につき、全員に加わる成長
+const HONEY_PER_BLOOM = 2;      // 花が1回咲くととれる蜜
+const CHAIN_STEP = 1;           // 1本の光が2つ目・3つ目…に当たるたびに増える成長と蜜
 const XP_PER_LEVEL = 4;
 const ATK_PER_LEVEL = 5;
-const HONEY_PER_BLOOM = 2;      // 花が1回咲くととれる蜜
 const BOSS_WEAK = 'moon';
 const WEAK_MULT = 1.5;
 const ROUNDS = 3;
 const CRIT_RATE = 0.2;
 const CRIT_MULT = 1.5;
 const TIME_BONUS_STEP = 10;     // 持ち時間が10秒残るごとに蜜1つ
-// ステージごとの影の竜の体力。AIに遊ばせて、勝率がステージ1で約65%、以降55・50・45・40・35・30%になるよう決めた
-const BOSS_HP = [45, 220, 440, 770, 1100, 1400, 1700];
+// ステージごとの影の竜の体力。AIに遊ばせて、勝率がステージ1で約50%、以降40・35・30・25・22%になるよう決めた（v0.4より強い）
+const BOSS_HP = [170, 490, 870, 1300, 1650, 2080];
 
-// ステージ: 光は1本から始めて1つずつ増やし、4本そろったら仕掛けを1種類ずつ足す
+// ステージ: 光は1本から始めて1つずつ増やし（最大3本）、そろったら仕掛けを1種類ずつ足す
 const STAGES = [
-  { lights: ['morning'], time: 45, rocks: 4, rise: 8, cracks: 0 },
-  { lights: ['morning', 'night'], time: 50, rocks: 4, rise: 10, cracks: 1, intro: 'moon' },
-  { lights: ['morning', 'evening', 'night'], time: 55, rocks: 4, cracks: 2, weather: true, intro: 'evening' },
-  { lights: ['morning', 'noon', 'evening', 'night'], time: 60, rocks: 3, cracks: 3, weather: true, intro: 'noon' },
-  { lights: ['morning', 'noon', 'evening', 'night'], time: 55, rocks: 3, cracks: 3, weather: true, vanes: 2, intro: 'vane' },
-  { lights: ['morning', 'noon', 'evening', 'night'], time: 50, rocks: 3, cracks: 3, weather: true, vanes: 2, vines: 1, intro: 'vine' },
-  { lights: ['morning', 'noon', 'evening', 'night'], time: 45, rocks: 3, cracks: 3, weather: true, vanes: 2, vines: 1, lanterns: 1, intro: 'lantern' },
+  { lights: ['morning'], time: 45, rocks: 3, rise: 8 },
+  { lights: ['morning', 'night'], time: 50, rocks: 3, rise: 10, intro: 'moon' },
+  { lights: ['morning', 'evening', 'night'], time: 55, rocks: 3, weather: true, intro: 'evening' },
+  { lights: ['morning', 'evening', 'night'], time: 55, rocks: 2, weather: true, vanes: 2, intro: 'vane' },
+  { lights: ['morning', 'evening', 'night'], time: 50, rocks: 2, weather: true, vanes: 2, vines: 1, intro: 'vine' },
+  { lights: ['morning', 'evening', 'night'], time: 45, rocks: 2, weather: true, vanes: 2, vines: 1, lanterns: 1, intro: 'lantern' },
 ];
 function stageParams(n) {
   const base = STAGES[Math.min(n, STAGES.length) - 1];
   const extra = Math.max(0, n - STAGES.length);
   return {
     vanes: 0, vines: 0, lanterns: 0, weather: false, rise: 12, ...base,  // rise: 毎晩上がる基本の深さ(m)
-    hp: BOSS_HP[n - 1] ?? Math.round(BOSS_HP[BOSS_HP.length - 1] * Math.pow(1.2, extra)),
+    hp: BOSS_HP[n - 1] ?? Math.round(BOSS_HP[BOSS_HP.length - 1] * Math.pow(1.25, extra)),
     time: extra ? Math.max(35, base.time - 5 * extra) : base.time,
     vines: extra ? 2 : base.vines || 0,
     lanterns: extra >= 2 ? 2 : base.lanterns || 0,
-    overRise: n >= 5 ? 2 : 1,     // 持ち時間を過ぎたあと1秒ごとに上がる深さ
+    overRise: n >= 4 ? 2 : 1,     // 持ち時間を過ぎたあと1秒ごとに上がる深さ
     intro: extra ? null : base.intro,
   };
 }
 const INTROS = {
-  moon: { title: '新しい光：月', text: '夜、月が差し込みます。月は日ごとに西→南→東へ移り、満ちていきます。月竜と月見草は月の光が好きです。' },
-  evening: { title: '新しい光：夕日', text: '西の窓から夕日が差します。このステージから天気が変わるようになり、朝霧や夕立で日差しが欠ける日があります。' },
-  noon: { title: '新しい光：昼の日差し', text: '南の窓から昼の日差しが差します。これで朝・昼・夕・夜の4本がそろいました。' },
+  moon: { title: '新しい光：月', text: '夜、月が差し込みます。月は日ごとに西→南→東へ移り、満ちていきます（十三夜は月光が2倍）。月竜と月見草は月の光が好きです。' },
+  evening: { title: '新しい光：夕日', text: '西の窓から夕日が差します。これで朝日・夕日・月の3本です。このステージから天気が変わり、朝霧の日は朝日、夕立の日は夕日が差しません。' },
   vane: { title: '新しい仕掛け：風見鏡', text: '動かせない鏡です。毎晩、向きが変わります。' },
   vine: { title: '新しい仕掛け：蔓', text: '光をさえぎります。毎晩1マスずつ伸び、次に伸びるマスは点線で見えます。' },
-  lantern: { title: '新しい仕掛け：水晶灯籠', text: '光を左右の2本に分けます。分かれた光が照らした竜も、同じ1本の光として連鎖に数えます。' },
+  lantern: { title: '新しい仕掛け：水晶灯籠', text: '光を左右の2本に分けます。分かれた先で当たったものも、同じ1本の光の連鎖に数えます。' },
 };
-const LIGHT_NAMES = { morning: '朝日', noon: '昼の日差し', evening: '夕日' };
-const LIGHT_SIDES = { morning: 'E', noon: 'S', evening: 'W' };
-const WINDOW_KEYS = { morning: 'east', noon: 'south', evening: 'west' };
+const LIGHT_NAMES = { morning: '朝日', evening: '夕日' };
+const LIGHT_SIDES = { morning: 'E', evening: 'W' };
+const WINDOW_KEYS = { morning: 'east', evening: 'west' };
 const WEATHER = {
-  sunny:  { name: '晴れ', morning: 1, noon: 1, evening: 1, weight: 55 },
-  mist:   { name: '朝霧', morning: 0, noon: 1, evening: 1, weight: 15, note: '朝日なし' },
-  cloudy: { name: '曇り', morning: 1, noon: 0, evening: 1, weight: 15, note: '昼の日差しなし' },
-  shower: { name: '夕立', morning: 1, noon: 1, evening: 0, weight: 15, note: '夕日なし' },
+  sunny:  { name: '晴れ', morning: 1, evening: 1, weight: 60 },
+  mist:   { name: '朝霧', morning: 0, evening: 1, weight: 20, note: '朝日が差しません' },
+  shower: { name: '夕立', morning: 1, evening: 0, weight: 20, note: '夕日が差しません' },
 };
 // 月の通り道: 夕方の空で西（左の壁を上から下）→ 南（下の壁を左から右）→ 東（右の壁を下から上）
 const MOON_PATH = [
@@ -674,25 +678,86 @@ function newRun(seed) {
   S.screen = 'intro';
 }
 
+// 光が入る窓の最初の1マス（ここには庭石・蔓・裂け目・仕掛けを置かない）
+function entryTiles() {
+  const set = new Set();
+  const lights = P().lights;
+  if (lights.includes('morning')) set.add(key(S.garden.east, SIZE - 1));
+  if (lights.includes('evening')) set.add(key(S.garden.west, 0));
+  if (lights.includes('night')) for (let d = 1; d <= MAX_DAYS; d++) { const m = moonOf(d); const e = entry(m.side, m.pos); set.add(key(e.r, e.c)); }
+  return [...set];
+}
+
+// 庭を1つ作る。花は窓の列や竜と同じ行・列に置いて、続けて当てやすくする
+function buildGarden() {
+  const p = P();
+  Object.assign(S, { rocks: [], vanes: {}, vines: [], vineNext: [], lanterns: [], flowers: [], cracks: [], mirrors: {}, eggs: [] });
+  S.garden = { east: randInt(SIZE), west: randInt(SIZE) };
+  S.reserved = entryTiles();
+  for (let i = 0; i < p.rocks; i++) S.rocks.push(randomEmpty(true));
+  for (let i = 0; i < p.vanes; i++) { const k = randomEmpty(true); if (k) S.vanes[k] = rand() < .5 ? '/' : '\\'; }
+  for (let i = 0; i < p.lanterns; i++) { const k = randomEmpty(true); if (k) S.lanterns.push(k); }
+  for (let i = 0; i < p.vines; i++) { const k = randomEmpty(true); if (k) S.vines.push([k]); }
+  const types = hasMoon() ? ['sun', 'sun', 'moon'] : ['sun', 'sun', 'sun'];
+  for (const type of types.slice(0, START_FLOWERS)) {
+    const lines = [];
+    for (let r = 0; r < SIZE; r++) for (let c = 0; c < SIZE; c++) {
+      if (occupied(r, c)) continue;
+      if (r === S.garden.east || r === S.garden.west || S.dragons.some(d => d.r === r || d.c === c)) lines.push(key(r, c));
+    }
+    const k = lines.length ? lines[randInt(lines.length)] : randomEmpty(false);
+    if (k) S.flowers.push({ k, type });
+  }
+  const crack = randomEmpty(true);
+  if (crack) S.cracks.push(crack);
+}
+
+// 1日目に鏡で何回続けて当てられるか（鏡を1枚ずつ一番よい場所に置いていった場合）
+function totalHits() { return sources().map(trace).reduce((a, t) => a + t.hits.length + (t.hits.length > 1 ? t.hits.length - 1 : 0), 0); }
+function bestHits() {
+  S.mirrors = {};
+  let best = totalHits();
+  for (let n = 0; n < S.owned; n++) {
+    let cand = null;
+    const tiles = new Set(sources().map(trace).flatMap(t => t.tiles));
+    for (const k of tiles) {
+      const [r, c] = unkey(k);
+      if (occupied(r, c)) continue;
+      for (const m of ['/', '\\']) {
+        S.mirrors[k] = m;
+        const v = totalHits();
+        if (v > best) { best = v; cand = [k, m]; }
+        delete S.mirrors[k];
+      }
+    }
+    if (!cand) break;
+    S.mirrors[cand[0]] = cand[1];
+  }
+  S.mirrors = {};
+  return best;
+}
+
 function startStage(seed) {
   S.stageSeed = seed >>> 0;
   S.rng = S.stageSeed;
   S.teamAtStart = clone(S.dragons);
   const p = P();
   Object.assign(S, {
-    day: 1, phase: 'market', depth: START_DEPTH, cracks: [], newCracks: [], mirrors: {}, owned: START_MIRRORS,
-    honey: START_HONEY, eggs: [], flowers: [], pending: { egg: 0, sunseed: 0, moonseed: 0 }, placing: null,
+    day: 1, phase: 'garden', depth: START_DEPTH, newCracks: [], owned: START_MIRRORS,
+    honey: START_HONEY, pending: { egg: 0, sunseed: 0, moonseed: 0 }, placing: null, cart: [],
     incense: false, sealedTotal: 0, lastHatch: '', report: [],
-    rocks: [], vanes: {}, vines: [], vineNext: [], lanterns: [],
   });
-  S.garden = { east: randInt(SIZE), south: randInt(SIZE), west: randInt(SIZE) };
-  for (let i = 0; i < p.rocks; i++) S.rocks.push(randomEmpty());
-  for (let i = 0; i < p.vanes; i++) { const k = randomEmpty(); if (k) S.vanes[k] = rand() < .5 ? '/' : '\\'; }
-  for (let i = 0; i < p.lanterns; i++) { const k = randomEmpty(); if (k) S.lanterns.push(k); }
-  for (let i = 0; i < p.vines; i++) { const k = randomEmpty(); if (k) S.vines.push([k]); }
-  // 花壇: 最初から日向花と、月が差すステージなら月見草が1つずつ咲いている
-  for (const type of hasMoon() ? ['sun', 'moon'] : ['sun', 'sun']) { const k = randomEmpty(); if (k) S.flowers.push({ k, type }); }
-  S.cracks.push(randomEmpty());
+  S.forecast = [{ weather: 'sunny' }, { weather: 'sunny' }];
+  // 続けて当てやすい庭になるまで何度か作り直す（同じステージなら毎回同じ庭になる）
+  const goal = S.stage === 1 ? 4 : 6;
+  let best = null;
+  for (let i = 0; i < 10; i++) {
+    buildGarden();
+    const score = bestHits();
+    if (!best || score > best.score) best = { score, layout: clone({ garden: S.garden, reserved: S.reserved, rocks: S.rocks, vanes: S.vanes, vines: S.vines, lanterns: S.lanterns, flowers: S.flowers, cracks: S.cracks }) };
+    if (score >= goal) break;
+  }
+  Object.assign(S, best.layout);
   S.forecast = [{ weather: 'sunny' }, { weather: pickWeather() }];
   computeVineNext();
   rollWares();
@@ -707,10 +772,11 @@ function occupied(r, c) {
     || S.vines.some(v => v.includes(k)) || S.vineNext.includes(k)
     || S.eggs.some(e => e.k === k) || S.flowers.some(f => f.k === k) || !!dragonAt(r, c);
 }
-function randomEmpty() {
+// blocker: 光をさえぎる・吸うものを置くときは、窓の前のマスを避ける
+function randomEmpty(blocker) {
   for (let i = 0; i < 300; i++) {
     const r = randInt(SIZE), c = randInt(SIZE);
-    if (!occupied(r, c)) return key(r, c);
+    if (!occupied(r, c) && !(blocker && S.reserved.includes(key(r, c)))) return key(r, c);
   }
   return null;
 }
@@ -719,7 +785,7 @@ function rollWares() {
   const a = pool.splice(randInt(pool.length), 1)[0];
   const b = pool.splice(randInt(pool.length), 1)[0];
   S.wares = ['mirror', a, b];
-  S.sold = [];
+  S.cart = [];
 }
 // 蔓は庭の中心に近づく向きを優先して1マスずつ伸びる（毎回同じ規則なので先が読める）
 function computeVineNext() {
@@ -728,7 +794,7 @@ function computeVineNext() {
     const [r, c] = unkey(v[v.length - 1]);
     const dirs = [[-1, 0], [1, 0], [0, -1], [0, 1]]
       .map(([dr, dc]) => ({ r: r + dr, c: c + dc }))
-      .filter(p => inside(p.r, p.c) && !occupied(p.r, p.c))
+      .filter(p => inside(p.r, p.c) && !occupied(p.r, p.c) && !S.reserved.includes(key(p.r, p.c)))
       .sort((a, b) => (Math.abs(a.r - 3) + Math.abs(a.c - 3)) - (Math.abs(b.r - 3) + Math.abs(b.c - 3)) || a.r - b.r || a.c - b.c);
     if (dirs[0]) S.vineNext.push(key(dirs[0].r, dirs[0].c));
   }
@@ -742,7 +808,7 @@ const level = xp => 1 + Math.floor(xp / XP_PER_LEVEL);
 const attackAt = (d, xp = d.xp) => level(xp) * ATK_PER_LEVEL * (d.type === BOSS_WEAK ? WEAK_MULT : 1);
 const mirrorsUsed = () => Object.keys(S.mirrors).length;
 
-// その日に差す光（ステージで本数が決まる）
+// その日に差す光（ステージで本数が決まる。最大3本）
 function sources() {
   const w = WEATHER[today().weather], m = moonOf(S.day);
   return P().lights.map(id => id === 'night'
@@ -756,9 +822,10 @@ function entry(side, pos) {
   return { r: SIZE - 1, c: pos, dr: -1, dc: 0, pt: [EDGE + pos + .5, TOP + SIZE + EDGE / 2] };
 }
 
-// 光の通り道。竜・卵・花は光を通し、庭石と蔓は止め、裂け目は光を吸って封じられ、水晶灯籠は左右に分ける
+// 光の通り道。竜・卵・花は光を通し、庭石と蔓は止め、裂け目は光を吸って封じられ、水晶灯籠は左右に分ける。
+// 当たった順に hits へ積む（竜と、その光で咲く花）。n番目に当たったものは成長・蜜が (n-1)×CHAIN_STEP 増える
 function trace(src) {
-  const res = { ...src, paths: [], lit: [], blooms: [], seals: [], gains: {}, honey: 0 };
+  const res = { ...src, paths: [], tiles: [], hits: [], lit: [], blooms: [], seals: [], gains: {}, honey: 0 };
   if (!src.mult) return res;
   const e = entry(src.side, src.pos);
   const queue = [{ r: e.r, c: e.c, dr: e.dr, dc: e.dc, pts: [e.pt] }];
@@ -773,10 +840,22 @@ function trace(src) {
       if (S.rocks.includes(k) || S.vines.some(v => v.includes(k))) { end = 'block'; break; }
       if (S.cracks.includes(k)) { end = 'crack'; if (!res.seals.includes(k)) res.seals.push(k); break; }
       pts.push(center(r, c));
+      if (!res.tiles.includes(k)) res.tiles.push(k);
       const d = dragonAt(r, c);
-      if (d && !res.lit.includes(d)) res.lit.push(d);
+      if (d && !res.lit.includes(d)) {
+        const n = res.hits.length;
+        res.lit.push(d);
+        res.gains[d.id] = ((d.type === src.light ? GAIN_LIKED : GAIN_OTHER) + n * CHAIN_STEP) * src.mult;
+        res.hits.push({ kind: 'dragon', id: d.id, r, c, n: n + 1, value: res.gains[d.id] });
+      }
       const f = flowerAt(k);
-      if (f && f.type === src.light && !res.blooms.includes(k)) res.blooms.push(k);
+      if (f && f.type === src.light && !res.blooms.includes(k)) {
+        const n = res.hits.length;
+        const honey = (HONEY_PER_BLOOM + n * CHAIN_STEP) * src.mult;
+        res.blooms.push(k);
+        res.honey += honey;
+        res.hits.push({ kind: 'flower', k, r, c, n: n + 1, value: honey });
+      }
       if (S.lanterns.includes(k)) {
         for (const [nr, nc] of [[dc, dr], [-dc, -dr]]) queue.push({ r: r + nr, c: c + nc, dr: nr, dc: nc, pts: [center(r, c)] });
         end = 'split';
@@ -794,9 +873,6 @@ function trace(src) {
     }
     if (pts.length > 1) res.paths.push(pts);
   }
-  const chain = res.lit.length - 1;
-  for (const d of res.lit) res.gains[d.id] = ((d.type === src.light ? GAIN_LIKED : GAIN_OTHER) + chain * CHAIN_BONUS) * src.mult;
-  res.honey = res.blooms.length * HONEY_PER_BLOOM * src.mult;
   return res;
 }
 
@@ -814,19 +890,17 @@ function dayPlan() {
   const blooms = new Set(traces.flatMap(t => t.blooms));
   return { traces, sealed: sealed.size, open, change, gains, honey, blooms };
 }
-function newCrackCount(day) {
-  const level = P().cracks;  // その夜に開く裂け目の数の増え方（ステージで変わる）
-  if (level === 0) return 1;
-  if (level === 1) return day >= 5 ? 2 : 1;
-  if (level === 2) return day >= 4 ? 2 : 1;
-  return day >= 6 ? 3 : day >= 3 ? 2 : 1;
+// その夜に開く裂け目の数（上限まで）
+function newCrackCount(day, open = S.cracks.length) {
+  const want = S.stage >= 3 && day >= 5 ? 2 : 1;
+  return Math.max(0, Math.min(want, MAX_CRACKS - open));
 }
 function eta(plan) {
   let depth = Math.min(DEPTH_CAP, S.depth + plan.change);
   if (depth <= 0 || S.day >= MAX_DAYS) return { night: S.day };
   let open = plan.open, day = S.day;
   while (day < MAX_DAYS) {
-    open += newCrackCount(day);
+    open += newCrackCount(day, open);
     day++;
     depth -= P().rise + RISE_PER_CRACK * open;
     if (depth <= 0) return { night: day };
@@ -868,7 +942,7 @@ function renderBoard(plan) {
         cls.push(s.mult ? 'sun' : 'off');
         icons.push(s.mult
           ? `<span class="src sun" role="img" aria-label="${s.label}が差し込む窓">☀︎</span>`
-          : `<span class="src off" role="img" aria-label="${s.label}の窓（天気で出ない）">☁︎</span>`);
+          : `<span class="src off" role="img" aria-label="${s.label}の窓（${WEATHER[today().weather].name}で差さない）">☁︎</span>`);
       } else {
         cls.push('moon');
         if (moonToday.dim) cls.push('dim');
@@ -925,26 +999,36 @@ function renderBoard(plan) {
   if (S.newCracks.length) setTimeout(() => { S.newCracks = []; }, 700);
 }
 
+const cartCost = () => S.cart.reduce((a, i) => a + WARES[S.wares[i]].price, 0);
+function forecastText() {
+  if (S.day >= MAX_DAYS) return '';
+  const parts = [];
+  if (P().weather) {
+    const tw = WEATHER[S.forecast[1].weather];
+    parts.push(`${tw.name}${tw.note ? `（${tw.note}）` : ''}`);
+  }
+  if (hasMoon()) {
+    const m = moonOf(S.day + 1);
+    parts.push(`月は${m.name}${m.mult > 1 ? '（月光×2）' : ''}`);
+  }
+  return parts.join('・');
+}
+
 function renderPanels(plan) {
   const p = P(), phase = S.phase;
   $('dayText').textContent = `ステージ${S.stage}・${S.day}日目`;
   for (const li of $('steps').children) {
     const now = li.dataset.p === phase || (phase === 'report' && li.dataset.p === 'light');
     li.classList.toggle('now', now);
+    li.hidden = li.dataset.p === 'market' && S.day === 1;
     if (now) li.setAttribute('aria-current', 'step'); else li.removeAttribute('aria-current');
   }
-  // 空: 今日差す光と天気（明日の分は予報）
+  // 空: 今日差す光と天気
   const w = WEATHER[today().weather], m = moonOf(S.day);
   const names = sources().map(s => s.light === 'moon'
     ? `<b class="${s.mult > 1 ? 'good' : ''}">☾${m.name}${s.mult > 1 ? `（×${s.mult}）` : ''}</b>`
     : s.mult ? `<b>☀︎${s.label}</b>` : `<span class="bad">☁︎${s.label}なし</span>`);
-  let sky = `今日の光 ${names.join('・')}`;
-  if (p.weather) sky += `　天気 <b class="${w.note ? 'bad' : ''}">${w.name}</b>`;
-  if (S.day < MAX_DAYS && (p.weather || hasMoon())) {
-    const tw = WEATHER[S.forecast[1].weather];
-    sky += `　明日 ${[p.weather ? tw.name : '', hasMoon() ? moonOf(S.day + 1).name : ''].filter(Boolean).join('・')}`;
-  }
-  $('sky').innerHTML = sky;
+  $('sky').innerHTML = `今日の光 ${names.join('・')}${p.weather ? `　天気 <b class="${w.note ? 'bad' : ''}">${w.name}</b>` : ''}`;
   $('timer').hidden = !(phase === 'market' || phase === 'garden');
 
   $('marketPanel').hidden = phase !== 'market';
@@ -952,11 +1036,12 @@ function renderPanels(plan) {
   $('lightPanel').hidden = !(phase === 'light' || phase === 'report');
 
   if (phase === 'market') {
-    $('honey').textContent = S.honey;
+    const left = S.honey - cartCost();
+    $('honey').textContent = left;
     $('wares').innerHTML = S.wares.map((id, i) => {
-      const ware = WARES[id], sold = S.sold.includes(i);
-      const blocked = busy || sold || S.screen !== 'play' || !canBuy(id);
-      return `<button type="button" class="ware${sold ? ' sold' : ''}" data-i="${i}"${blocked ? ' disabled' : ''}><b>${ware.name}</b><span>${sold ? '買った' : ware.text}</span><em>蜜${ware.price}</em></button>`;
+      const ware = WARES[id], picked = S.cart.includes(i);
+      const blocked = !picked && (busy || S.screen !== 'play' || !canBuy(id) || ware.price > left);
+      return `<button type="button" class="ware${picked ? ' picked' : ''}" data-i="${i}" aria-pressed="${picked}"${blocked ? ' disabled' : ''}><b>${ware.name}</b><span>${picked ? '選んだ（もう一度で取り消す）' : ware.text}</span><em>蜜${ware.price}</em></button>`;
     }).join('');
     const pend = Object.entries(S.pending).filter(([, n]) => n).map(([k, n]) => `${PLACE_NAMES[k]}${n}`);
     $('marketInfo').innerHTML = [
@@ -967,18 +1052,29 @@ function renderPanels(plan) {
   }
 
   if (phase === 'garden' && plan) {
+    // 天気・月の知らせ（何が起きているかをはっきり書く）
+    const banners = [];
+    for (const s of sources()) {
+      if (s.light === 'sun' && !s.mult) banners.push(`<p class="banner bad">☁︎ ${w.name}のため、今日は${s.label}が差しません</p>`);
+      if (s.light === 'moon' && s.mult > 1) banners.push(`<p class="banner good">☾ ${m.name}${S.incense ? '・満月の香' : ''}：今夜の月光は${s.mult}倍です</p>`);
+    }
+    $('banners').innerHTML = banners.join('');
     const tray = [`<span class="count">鏡 <b>${S.owned - mirrorsUsed()}</b> / ${S.owned}枚</span>`];
     for (const [k, n] of Object.entries(S.pending)) {
       if (!n) continue;
       tray.push(`<button type="button" class="chip${S.placing === k ? ' on' : ''}" data-place="${k}">${PLACE_NAMES[k]}を置く（${n}）</button>`);
     }
     $('tray').innerHTML = tray.join('');
+    const chains = plan.traces.filter(t => t.mult).map(t => {
+      const n = t.hits.length;
+      return `${t.light === 'sun' ? '☀︎' : '☾'}${t.label} <b class="${n >= 3 ? 'good' : ''}">${n ? `${n}連鎖` : '当たらない'}</b>`;
+    });
+    $('gardenChain').innerHTML = `${chains.join('　')}　蜜 <b>+${plan.honey}</b>`;
     $('dragons').innerHTML = S.dragons.map(d => {
       const g = plan.gains[d.id];
       const parts = [g.sun ? `<span class="sun-t">☀︎+${g.sun}</span>` : '', g.moon ? `<span class="moon-t">☾+${g.moon}</span>` : ''].filter(Boolean);
       return `<span class="dchip"><span class="token ${d.type}" aria-hidden="true">${d.type === 'sun' ? '陽' : '月'}</span>${d.name} Lv${level(d.xp)}<span class="gain">${parts.length ? parts.join(' ') : '光なし'}</span></span>`;
     }).join('') + S.eggs.map(() => '<span class="dchip"><span class="egg" style="width:16px;height:20px;margin:0 4px" aria-hidden="true"></span>卵（明日かえる）</span>').join('');
-    $('gardenHoney').innerHTML = `咲く花 <b>${plan.blooms.size}</b>・とれる蜜 <b>+${plan.honey}</b>`;
     const parts = [`基本−${p.rise}`];
     if (plan.open) parts.push(`裂け目${plan.open}つ −${plan.open * RISE_PER_CRACK}`);
     if (plan.sealed) parts.push(`封印${plan.sealed}つ +${plan.sealed * SEAL_PUSH}`);
@@ -1001,25 +1097,26 @@ function renderPanels(plan) {
 
   // 主ボタン
   const main = $('mainBtn');
-  $('backBtn').hidden = phase !== 'garden';
-  if (phase === 'market') { main.textContent = '庭へ出て鏡を置く'; main.disabled = S.screen !== 'play'; }
+  if (phase === 'market') { main.textContent = S.cart.length ? '決めて庭へ（鏡を置く）' : '何も買わずに庭へ'; main.disabled = S.screen !== 'play'; }
   if (phase === 'garden') { main.textContent = '光を通す'; main.disabled = busy || S.screen !== 'play' || !!S.placing; }
   if (phase === 'light') { main.textContent = '光が差している…'; main.disabled = true; }
   if (phase === 'report') { main.textContent = '次の朝へ'; main.disabled = S.screen !== 'play'; }
   const hints = {
-    market: '蜜で道具を買ってから庭へ。買った種や卵は庭で置きます',
-    garden: S.placing ? `${PLACE_NAMES[S.placing]}を置くマスをタップ` : 'マスをタップで鏡（置く→向きを変える→外す）',
+    market: '品をタップで選ぶ。もう一度タップで取り消し。庭へ出ると決まります',
+    garden: S.placing ? `${PLACE_NAMES[S.placing]}を置くマスをタップ` : 'マスをタップで鏡（置く→向きを変える→外す）。続けて当てるほど連鎖で増える',
     light: '',
     report: '鏡は手元に戻りました',
   };
   $('hint').textContent = hints[phase];
 }
 
+// 市で選べるか（かごに入れたものも数に入れる）
 function canBuy(id) {
+  const inCart = x => S.cart.filter(i => S.wares[i] === x).length;
   const pend = S.pending;
-  if (id === 'mirror') return S.owned < MAX_MIRRORS;
-  if (id === 'egg') return S.dragons.length + S.eggs.length + pend.egg < MAX_DRAGONS;
-  if (id === 'sunseed' || id === 'moonseed') return S.flowers.length + pend.sunseed + pend.moonseed < MAX_FLOWERS;
+  if (id === 'mirror') return S.owned + inCart('mirror') < MAX_MIRRORS;
+  if (id === 'egg') return S.dragons.length + S.eggs.length + pend.egg + inCart('egg') < MAX_DRAGONS;
+  if (id === 'sunseed' || id === 'moonseed') return S.flowers.length + pend.sunseed + pend.moonseed + inCart('sunseed') + inCart('moonseed') < MAX_FLOWERS;
   if (id === 'incense') return !S.incense;
   return true;
 }
@@ -1109,37 +1206,34 @@ function toast(msg, ms = 2600) {
 
 const wait = ms => new Promise(res => setTimeout(res, reduceMotion ? Math.min(ms, 120) : ms));
 
-// ---- 市の場面 ----
-function buyWare(i) {
-  if (busy || S.screen !== 'play' || S.phase !== 'market' || S.sold.includes(i)) return;
+// ---- 市の場面（品を選び直せる。庭へ出るときに決まる） ----
+function toggleWare(i) {
+  if (busy || S.screen !== 'play' || S.phase !== 'market') return;
+  if (S.cart.includes(i)) { S.cart = S.cart.filter(x => x !== i); render(); return; }
   const id = S.wares[i], ware = WARES[id];
   if (!canBuy(id)) return;
-  if (S.honey < ware.price) { toast(`蜜があと${ware.price - S.honey}足りません`); return; }
-  S.honey -= ware.price;
-  S.sold.push(i);
-  if (id === 'mirror') { S.owned++; toast('鏡を1枚買いました'); }
-  if (id === 'egg' || id === 'sunseed' || id === 'moonseed') { S.pending[id]++; toast(`${ware.name}を買いました。庭で置きます`); }
-  if (id === 'seal') { S.depth = Math.min(DEPTH_CAP, S.depth + SEAL_CHARM_PUSH); toast(`影の竜を${SEAL_CHARM_PUSH}m押し戻しました`); }
-  if (id === 'feast') {
-    for (const d of S.dragons) { d.xp += 2; floatAt(d.r, d.c, '+2', 'sun'); }
-    toast('竜たちがごちそうを平らげた');
-  }
-  if (id === 'incense') { S.incense = true; toast('今夜の月光が2倍になります'); }
+  if (S.honey - cartCost() < ware.price) { toast(`蜜があと${ware.price - (S.honey - cartCost())}足りません`); return; }
+  S.cart.push(i);
   render();
 }
 function goGarden() {
   if (S.screen !== 'play' || S.phase !== 'market') return;
+  const bought = [];
+  for (const i of S.cart) {
+    const id = S.wares[i], ware = WARES[id];
+    S.honey -= ware.price;
+    bought.push(ware.name);
+    if (id === 'mirror') S.owned++;
+    if (id === 'egg' || id === 'sunseed' || id === 'moonseed') S.pending[id]++;
+    if (id === 'seal') S.depth = Math.min(DEPTH_CAP, S.depth + SEAL_CHARM_PUSH);
+    if (id === 'feast') for (const d of S.dragons) { d.xp += 2; floatAt(d.r, d.c, '+2', 'sun'); }
+    if (id === 'incense') S.incense = true;
+  }
+  S.cart = [];
   S.phase = 'garden';
-  const firstPending = Object.keys(S.pending).find(k => S.pending[k]);
-  S.placing = firstPending || null;
+  S.placing = Object.keys(S.pending).find(k => S.pending[k]) || null;
   render();
-  if (S.stage === 1 && S.day === 1) toast('マスをタップして鏡を置き、朝日を竜と花に届けよう', 3200);
-}
-function backToMarket() {
-  if (busy || S.phase !== 'garden') return;
-  S.phase = 'market';
-  S.placing = null;
-  render();
+  if (bought.length) toast(`${bought.join('・')}を買いました`);
 }
 
 // ---- 鏡の場面 ----
@@ -1197,23 +1291,26 @@ function fire(t) {
   return wait(dur);
 }
 
-// 光を当てた結果を反映し、報告の1行を返す
+// 光を当てた結果を反映し、報告の1行を返す。当たった順に連鎖の数字を出す
 function applyLight(t) {
   const notes = [];
-  t.lit.forEach((d, i) => {
-    const before = level(d.xp), g = t.gains[d.id];
-    d.xp += g;
-    notes.push(`${d.name}+${g}${level(d.xp) > before ? '（Lv' + level(d.xp) + '）' : ''}`);
-    setTimeout(() => {
-      floatAt(d.r, d.c, `${t.light === 'sun' ? '☀︎' : '☾'}+${g}`, t.light);
-      if (level(d.xp) > before) floatAt(d.r, d.c, 'Lv UP', 'lvup', -.55);
-    }, i * 120);
+  t.hits.forEach((h, i) => {
+    if (h.kind === 'dragon') {
+      const d = S.dragons.find(x => x.id === h.id);
+      const before = level(d.xp);
+      d.xp += h.value;
+      notes.push(`${d.name}+${h.value}${level(d.xp) > before ? '（Lv' + level(d.xp) + '）' : ''}`);
+      setTimeout(() => {
+        floatAt(h.r, h.c, `${t.light === 'sun' ? '☀︎' : '☾'}+${h.value}`, t.light);
+        if (level(d.xp) > before) floatAt(h.r, h.c, 'Lv UP', 'lvup', .55);
+      }, i * 160);
+    } else {
+      S.honey += h.value;
+      notes.push(`花 蜜+${h.value}`);
+      setTimeout(() => floatAt(h.r, h.c, `蜜+${h.value}`, 'honey'), i * 160);
+    }
+    if (h.n >= 2) setTimeout(() => floatAt(h.r, h.c, `${h.n}連鎖！`, 'chain', -.55), i * 160);
   });
-  if (t.honey) {
-    S.honey += t.honey;
-    notes.push(`花が咲いて蜜+${t.honey}`);
-    t.blooms.forEach((k, i) => { const [r, c] = unkey(k); setTimeout(() => floatAt(r, c, `蜜+${HONEY_PER_BLOOM * t.mult}`, 'honey'), 150 + i * 120); });
-  }
   let sealed = 0;
   for (const k of t.seals) {
     if (!S.cracks.includes(k)) continue;
@@ -1224,7 +1321,8 @@ function applyLight(t) {
     floatAt(r, c, '封印', 'shade');
   }
   if (sealed) notes.push(`裂け目を${sealed}つ封印`);
-  return notes.length ? notes.join('・') : '何にも当たらなかった';
+  const head = t.hits.length >= 2 ? `<b class="chainword">${t.hits.length}連鎖</b> ` : '';
+  return head + (notes.length ? notes.join('・') : '何にも当たらなかった');
 }
 
 async function advance() {
@@ -1235,7 +1333,7 @@ async function advance() {
   const bonus = Math.floor(Math.max(0, S.timeLeft) / TIME_BONUS_STEP);
   S.honey += bonus;
   S.report = bonus ? [{ cls: 'night', html: `早く決めたので蜜+${bonus}` }] : [];
-  // その日の光の道は朝の盤面で決まる（予告どおりになるよう、途中で封じた裂け目で道は変えない）
+  // その日の光の道は鏡の場面の盤面で決まる（予告どおりになるよう、途中で封じた裂け目で道は変えない）
   const plan = dayPlan();
   render();
   beamsG.replaceChildren();
@@ -1251,7 +1349,7 @@ async function advance() {
     shaftPhase = t.id;
     renderShafts(t.id);
     if (!t.paths.length) {
-      S.report.push({ cls: t.light, html: `<b>${t.label}</b>　天気で出なかった` });
+      S.report.push({ cls: t.light, html: `<b>${t.label}</b>　${WEATHER[today().weather].name}で差さなかった` });
       render();
       await wait(700);
       continue;
@@ -1259,7 +1357,7 @@ async function advance() {
     await fire(t);
     S.report.push({ cls: t.light, html: `<b>${t.label}</b>　${applyLight(t)}` });
     render();
-    await wait(t.light === 'moon' ? 800 : 500);
+    await wait(t.light === 'moon' ? 700 + t.hits.length * 160 : 400 + t.hits.length * 160);
     beamsG.replaceChildren();
   }
   // 1日の終わり: 鏡は手元に戻り、影の竜が上がってくる
@@ -1288,12 +1386,15 @@ async function advance() {
   }
   S.vineNext = [];
   if (Object.keys(S.vanes).length) { for (const k of Object.keys(S.vanes)) S.vanes[k] = S.vanes[k] === '/' ? '\\' : '/'; night.push('風見鏡が回った'); }
-  for (let i = 0; i < newCrackCount(S.day); i++) {
-    const k = randomEmpty();
+  const spawn = newCrackCount(S.day);
+  for (let i = 0; i < spawn; i++) {
+    const k = randomEmpty(true);
     if (k) { S.cracks.push(k); S.newCracks.push(k); }
   }
-  night.unshift(`裂け目が${S.newCracks.length}つ開いた`);
+  night.unshift(S.newCracks.length ? `裂け目が${S.newCracks.length}つ開いた` : `裂け目は${MAX_CRACKS}つで上限`);
   S.report.push({ cls: 'night', html: `<b>夜のうちに</b>　${night.join('・')}` });
+  const fc = forecastText();
+  if (fc) S.report.push({ cls: 'night', html: `<b>明日の予報</b>　${fc}` });
   S.phase = 'report';
   busy = false;
   render();
@@ -1340,7 +1441,7 @@ function showStageCard() {
   $('stageEyebrow').textContent = `ステージ${S.stage}`;
   $('stageTitle').textContent = g ? g.title : S.stage === 1 ? '最初の庭' : '新しい庭';
   $('stageNew').hidden = !(g || S.stage === 1);
-  $('stageNew').innerHTML = g ? `<b>${g.title.split('：')[1]}</b>　${g.text}` : '差し込むのは<b>朝日</b>だけです。鏡で朝日を竜と花に届け、光の行き止まりで裂け目を封じましょう。';
+  $('stageNew').innerHTML = g ? `<b>${g.title.split('：')[1]}</b>　${g.text}` : '差し込むのは<b>朝日</b>だけです。鏡で朝日を曲げて、竜と花に続けて当てましょう（続けて当てるほど連鎖で増えます）。光の行き止まりを裂け目にすると封じられます。';
   $('stageFacts').innerHTML = `
     <dt>差す光</dt><dd>${p.lights.map(id => id === 'night' ? '月' : LIGHT_NAMES[id]).join('・')}</dd>
     <dt>影の竜の体力</dt><dd>${p.hp}（毎晩${p.rise}mずつ上がってくる）</dd>
@@ -1457,17 +1558,17 @@ function setPaused(on) {
 // ---- 起動 ----
 let S;
 function start(data) {
-  if (data && data.S && typeof data.S.stage === 'number' && data.S.phase) S = data.S;
+  if (data && data.S && typeof data.S.stage === 'number' && data.S.reserved) S = data.S;
   else newRun(Date.now());
   busy = false;
-  if (S.phase === 'light') { S.phase = 'garden'; }
+  if (S.phase === 'light') S.phase = 'garden';
   board.addEventListener('click', e => {
     const b = e.target.closest('button[data-r]');
     if (b) onCell(+b.dataset.r, +b.dataset.c);
   });
   $('wares').addEventListener('click', e => {
     const b = e.target.closest('button[data-i]');
-    if (b) buyWare(+b.dataset.i);
+    if (b) toggleWare(+b.dataset.i);
   });
   $('tray').addEventListener('click', e => {
     const b = e.target.closest('button[data-place]');
@@ -1476,7 +1577,6 @@ function start(data) {
     render();
   });
   $('mainBtn').addEventListener('click', onMain);
-  $('backBtn').addEventListener('click', backToMarket);
   $('nextBtn').addEventListener('click', afterBattle);
   $('restartBtn').addEventListener('click', restartRun);
   $('pauseBtn').addEventListener('click', () => setPaused(true));
@@ -1495,6 +1595,7 @@ function start(data) {
     $('stageCard').hidden = true;
     S.screen = 'play';
     render();
+    if (S.stage === 1 && S.day === 1) toast('マスをタップして鏡を置き、朝日を竜と花に続けて当てよう', 3400);
   });
   $('intro').hidden = S.screen !== 'intro';
   $('stageCard').hidden = true;
