@@ -112,6 +112,7 @@ h1 { font-family: var(--font-display); font-size: 20px; margin: 0 auto 0 0; lett
 .win.moon.strong { box-shadow: 0 0 16px 4px rgba(200, 228, 255, .85); }
 .win.sun.moon { background: linear-gradient(180deg, var(--sun) 50%, var(--moon) 50%); }
 .win.next { outline: 1.5px dashed var(--moon); outline-offset: -1px; }
+.win.next-sun { outline: 1.5px dashed var(--sun); outline-offset: -1px; }
 .src { display: grid; place-items: center; line-height: 1; flex: none; font-size: 13px; font-size: calc(100cqw * .04); }
 .src.sun { color: #5a3300; }
 .src.moon { color: #1d2d4a; }
@@ -484,7 +485,7 @@ body.night .actionbar { background: linear-gradient(180deg, transparent, var(--g
     <p class="story">王宮の地の底で、影の竜が目を覚ましつつある。地上に出れば王国は闇に沈む。飼育係のあなたに託されたのは、まだ幼い二頭の竜と、城壁に囲まれた小さな庭だけ。</p>
     <ul class="howto">
       <li>1日は<b>「市 → 鏡 → 光」</b>の場面で進みます（1日目は市なし）。市で蜜を払って道具を選び、庭に鏡を置き、光を通します。</li>
-      <li>光は城壁の窓から差し込みます。<b class="sun-t">朝日は東（右）、夕日は西（左）</b>。昼は日が高く、窓からは差し込みません。<b class="moon-t">月</b>は日ごとに西→南→東へ移りながら満ちていきます。最初は朝日だけで、ステージが進むと夕日と月が加わります（最大3本）。</li>
+      <li>光は城壁の窓から差し込みます。<b class="sun-t">朝日は東（右）、夕日は西（左）</b>の、向かい合う同じ高さの窓から。日の出・日の入りの位置は季節とともに<b>毎日1窓ずつ南へずれ</b>、いちばん南まで来ると北へ戻ります。昼は日が高く、窓からは差し込みません。<b class="moon-t">月</b>は日ごとに西→南→東へ移りながら満ちていきます。明日の窓は点線で見えます。最初は朝日だけで、ステージが進むと夕日と月が加わります（最大3本）。</li>
       <li>光が<b>竜</b>に当たると育ちます（好きな光なら+3、そうでなければ+1）。<b>花</b>は日向花なら日の光、月見草なら月の光で咲き、蜜（市のお金）がとれます。</li>
       <li><b>連鎖</b>: 1本の光が竜や咲く花に続けて当たるほど、2つ目は+1、3つ目は+2……と成長と蜜が増えます。鏡で光を曲げて、たくさん続けて当てましょう。</li>
       <li>影の竜は毎晩上がってきて、<b>裂け目</b>1つにつき5m速くなります。<b>光の行き止まりを裂け目にすると封じられ</b>、3m押し戻せます。</li>
@@ -567,8 +568,8 @@ const ROUNDS = 3;
 const CRIT_RATE = 0.2;
 const CRIT_MULT = 1.5;
 const TIME_BONUS_STEP = 10;     // 持ち時間が10秒残るごとに蜜1つ
-// ステージごとの影の竜の体力。AIに遊ばせて、勝率がステージ1で約50%、以降40・35・30・25・22%になるよう決めた（v0.4より強い）
-const BOSS_HP = [170, 490, 870, 1300, 1650, 2080];
+// ステージごとの影の竜の体力。AIに遊ばせて、勝率がステージ1で約50%、以降40・35・30・25・22%になるよう決めた（日の窓が毎日動く前提）
+const BOSS_HP = [125, 435, 760, 1165, 1500, 1870];
 
 // ステージ: 光は1本から始めて1つずつ増やし（最大3本）、そろったら仕掛けを1種類ずつ足す
 const STAGES = [
@@ -601,7 +602,12 @@ const INTROS = {
 };
 const LIGHT_NAMES = { morning: '朝日', evening: '夕日' };
 const LIGHT_SIDES = { morning: 'E', evening: 'W' };
-const WINDOW_KEYS = { morning: 'east', evening: 'west' };
+// 日の出・日の入りの窓: 現実でも秋は日ごとに南へずれ、冬至を過ぎると北へ戻る。
+// それを大きくして1日1窓ずつ動かす。朝日と夕日は南北の軸をはさんで向かい合う、同じ高さの窓から差す
+function sunRow(day) {
+  const p = (S.garden.sunPhase + day - 1) % (2 * (SIZE - 1));
+  return p <= SIZE - 1 ? p : 2 * (SIZE - 1) - p;
+}
 const WEATHER = {
   sunny:  { name: '晴れ', morning: 1, evening: 1, weight: 60 },
   mist:   { name: '朝霧', morning: 0, evening: 1, weight: 20, note: '朝日が差しません' },
@@ -682,8 +688,10 @@ function newRun(seed) {
 function entryTiles() {
   const set = new Set();
   const lights = P().lights;
-  if (lights.includes('morning')) set.add(key(S.garden.east, SIZE - 1));
-  if (lights.includes('evening')) set.add(key(S.garden.west, 0));
+  for (let d = 1; d <= MAX_DAYS; d++) {
+    if (lights.includes('morning')) set.add(key(sunRow(d), SIZE - 1));
+    if (lights.includes('evening')) set.add(key(sunRow(d), 0));
+  }
   if (lights.includes('night')) for (let d = 1; d <= MAX_DAYS; d++) { const m = moonOf(d); const e = entry(m.side, m.pos); set.add(key(e.r, e.c)); }
   return [...set];
 }
@@ -692,7 +700,7 @@ function entryTiles() {
 function buildGarden() {
   const p = P();
   Object.assign(S, { rocks: [], vanes: {}, vines: [], vineNext: [], lanterns: [], flowers: [], cracks: [], mirrors: {}, eggs: [] });
-  S.garden = { east: randInt(SIZE), west: randInt(SIZE) };
+  S.garden = { sunPhase: randInt(2 * (SIZE - 1)) };
   S.reserved = entryTiles();
   for (let i = 0; i < p.rocks; i++) S.rocks.push(randomEmpty(true));
   for (let i = 0; i < p.vanes; i++) { const k = randomEmpty(true); if (k) S.vanes[k] = rand() < .5 ? '/' : '\\'; }
@@ -703,7 +711,7 @@ function buildGarden() {
     const lines = [];
     for (let r = 0; r < SIZE; r++) for (let c = 0; c < SIZE; c++) {
       if (occupied(r, c)) continue;
-      if (r === S.garden.east || r === S.garden.west || S.dragons.some(d => d.r === r || d.c === c)) lines.push(key(r, c));
+      if ([1, 2, 3, 4].some(d => r === sunRow(d)) || S.dragons.some(d => d.r === r || d.c === c)) lines.push(key(r, c));
     }
     const k = lines.length ? lines[randInt(lines.length)] : randomEmpty(false);
     if (k) S.flowers.push({ k, type });
@@ -712,7 +720,7 @@ function buildGarden() {
   if (crack) S.cracks.push(crack);
 }
 
-// 1日目に鏡で何回続けて当てられるか（鏡を1枚ずつ一番よい場所に置いていった場合）
+// その日に鏡で何回続けて当てられるか（鏡を1枚ずつ一番よい場所に置いていった場合）
 function totalHits() { return sources().map(trace).reduce((a, t) => a + t.hits.length + (t.hits.length > 1 ? t.hits.length - 1 : 0), 0); }
 function bestHits() {
   S.mirrors = {};
@@ -736,6 +744,13 @@ function bestHits() {
   S.mirrors = {};
   return best;
 }
+// 窓は毎日動くので、最初の3日間の合計で庭のよさを測る
+function layoutScore() {
+  let total = 0;
+  for (let d = 1; d <= 3; d++) { S.day = d; total += bestHits(); }
+  S.day = 1;
+  return total;
+}
 
 function startStage(seed) {
   S.stageSeed = seed >>> 0;
@@ -749,11 +764,11 @@ function startStage(seed) {
   });
   S.forecast = [{ weather: 'sunny' }, { weather: 'sunny' }];
   // 続けて当てやすい庭になるまで何度か作り直す（同じステージなら毎回同じ庭になる）
-  const goal = S.stage === 1 ? 4 : 6;
+  const goal = S.stage === 1 ? 12 : 18;
   let best = null;
   for (let i = 0; i < 10; i++) {
     buildGarden();
-    const score = bestHits();
+    const score = layoutScore();
     if (!best || score > best.score) best = { score, layout: clone({ garden: S.garden, reserved: S.reserved, rocks: S.rocks, vanes: S.vanes, vines: S.vines, lanterns: S.lanterns, flowers: S.flowers, cracks: S.cracks }) };
     if (score >= goal) break;
   }
@@ -813,7 +828,7 @@ function sources() {
   const w = WEATHER[today().weather], m = moonOf(S.day);
   return P().lights.map(id => id === 'night'
     ? { id, light: 'moon', label: `月（${m.name}）`, side: m.side, pos: m.pos, mult: m.mult * (S.incense ? 2 : 1) }
-    : { id, light: 'sun', label: LIGHT_NAMES[id], side: LIGHT_SIDES[id], pos: S.garden[WINDOW_KEYS[id]], mult: w[id] });
+    : { id, light: 'sun', label: LIGHT_NAMES[id], side: LIGHT_SIDES[id], pos: sunRow(S.day), mult: w[id] });
 }
 const center = (r, c) => [EDGE + c + .5, TOP + r + .5];
 function entry(side, pos) {
@@ -930,6 +945,8 @@ function renderBoard(plan) {
   const srcs = sources();
   const moonToday = moonOf(S.day);
   const tomorrow = hasMoon() && S.day < MAX_DAYS ? moonOf(S.day + 1) : null;
+  const sunSides = P().lights.filter(id => LIGHT_SIDES[id]).map(id => LIGHT_SIDES[id]);
+  const tomorrowSun = sunSides.length && S.day < MAX_DAYS ? { row: sunRow(S.day + 1), sides: sunSides } : null;
   const litSun = new Set(), litMoon = new Set();
   if (plan) for (const t of plan.traces) for (const d of t.lit) (t.light === 'sun' ? litSun : litMoon).add(d.id);
   const out = [];
@@ -953,7 +970,10 @@ function renderBoard(plan) {
     if (here.length > 1) cls.push('two');
     const next = tomorrow && tomorrow.side === side && tomorrow.pos === pos;
     if (next) cls.push('next');
-    out.push(`<div class="edge ${side === 'S' ? 'h' : 'v'}" style="${gridPos}"><span class="${cls.join(' ')}"${next && !here.length ? ' role="img" aria-label="明日の月が差し込む窓"' : ''}>${icons.join('')}</span></div>`);
+    const nextSun = tomorrowSun && pos === tomorrowSun.row && tomorrowSun.sides.includes(side);
+    if (nextSun) cls.push('next-sun');
+    const label = !here.length && (next || nextSun) ? ` role="img" aria-label="明日の${[nextSun ? (side === 'E' ? '朝日' : '夕日') : '', next ? '月' : ''].filter(Boolean).join('と')}が差し込む窓"` : '';
+    out.push(`<div class="edge ${side === 'S' ? 'h' : 'v'}" style="${gridPos}"><span class="${cls.join(' ')}"${label}>${icons.join('')}</span></div>`);
   };
   out.push(`<div class="edge north" style="grid-row:1;grid-column:2 / span ${SIZE}"></div>`);
   for (const [row, col] of [[1, 1], [1, SIZE + 2], [SIZE + 2, 1], [SIZE + 2, SIZE + 2]]) out.push(`<div class="edge corner" style="grid-row:${row};grid-column:${col}"></div>`);
@@ -1003,6 +1023,8 @@ const cartCost = () => S.cart.reduce((a, i) => a + WARES[S.wares[i]].price, 0);
 function forecastText() {
   if (S.day >= MAX_DAYS) return '';
   const parts = [];
+  const sunNames = P().lights.filter(id => LIGHT_NAMES[id]).map(id => LIGHT_NAMES[id]);
+  if (sunNames.length) parts.push(`${sunNames.join('と')}は1つ${sunRow(S.day + 1) > sunRow(S.day) ? '南' : '北'}の窓へ`);
   if (P().weather) {
     const tw = WEATHER[S.forecast[1].weather];
     parts.push(`${tw.name}${tw.note ? `（${tw.note}）` : ''}`);
@@ -1441,7 +1463,7 @@ function showStageCard() {
   $('stageEyebrow').textContent = `ステージ${S.stage}`;
   $('stageTitle').textContent = g ? g.title : S.stage === 1 ? '最初の庭' : '新しい庭';
   $('stageNew').hidden = !(g || S.stage === 1);
-  $('stageNew').innerHTML = g ? `<b>${g.title.split('：')[1]}</b>　${g.text}` : '差し込むのは<b>朝日</b>だけです。鏡で朝日を曲げて、竜と花に続けて当てましょう（続けて当てるほど連鎖で増えます）。光の行き止まりを裂け目にすると封じられます。';
+  $('stageNew').innerHTML = g ? `<b>${g.title.split('：')[1]}</b>　${g.text}` : '差し込むのは<b>朝日</b>だけです。朝日の窓は毎日1つずつ動きます（点線の枠が明日の窓）。鏡で朝日を曲げて、竜と花に続けて当てましょう（続けて当てるほど連鎖で増えます）。光の行き止まりを裂け目にすると封じられます。';
   $('stageFacts').innerHTML = `
     <dt>差す光</dt><dd>${p.lights.map(id => id === 'night' ? '月' : LIGHT_NAMES[id]).join('・')}</dd>
     <dt>影の竜の体力</dt><dd>${p.hp}（毎晩${p.rise}mずつ上がってくる）</dd>
@@ -1558,7 +1580,7 @@ function setPaused(on) {
 // ---- 起動 ----
 let S;
 function start(data) {
-  if (data && data.S && typeof data.S.stage === 'number' && data.S.reserved) S = data.S;
+  if (data && data.S && typeof data.S.stage === 'number' && data.S.reserved && data.S.garden && 'sunPhase' in data.S.garden) S = data.S;
   else newRun(Date.now());
   busy = false;
   if (S.phase === 'light') S.phase = 'garden';
