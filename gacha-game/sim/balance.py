@@ -223,6 +223,7 @@ MAX_ROUNDS = 20
 DMG_SPREAD = 0.3  # ダメージの乱数幅 (0.3 なら ±30%)。格下にも勝ち目を残すため大きめ
 CRIT_RATE, CRIT_MULT = 0.2, 1.5  # 会心
 RESONANCE = 1.5  # 霊獣・霊具が精霊と同じ属性なら補正値 x1.5
+GEAR_SKILL_SCALE = 0.5  # 霊獣・霊具が持つスキルの効き目(精霊が持つ同じスキルに対して)
 
 
 def affinity(att, dfn):
@@ -242,11 +243,12 @@ class Unit:
     rank: int = 1  # 3枚とも同じランクとして扱う
     hp: float = 0
     atk: float = 0
-    skills: set = field(default_factory=set)
+    spirit_skills: set = field(default_factory=set)
+    gear_skills: set = field(default_factory=set)
 
     def __post_init__(self):
         self.hp, self.atk = self.spirit.stats(self.rank)
-        self.skills = {self.spirit.skill} - {""}
+        self.spirit_skills = {self.spirit.skill} - {""}
         for gear in (self.beast, self.tool):
             if gear is None:
                 continue
@@ -255,7 +257,7 @@ class Unit:
             self.hp += hp * resonance
             self.atk += atk * resonance
             if gear.skill:
-                self.skills.add(gear.skill)
+                self.gear_skills.add(gear.skill)
 
     @property
     def attr(self):
@@ -267,46 +269,74 @@ class Fighter:
         self.u, self.hp, self.atk_mod = unit, unit.hp, 1.0
         self.rounds, self.curse, self.guts_used = 0, 0, False
 
-    def has(self, skill):
-        return skill in self.u.skills
+    def power(self, skill):
+        """スキルの効き目。精霊自身のスキルなら1、霊獣・霊具だけが持つなら GEAR_SKILL_SCALE、なければ0。"""
+        if skill in self.u.spirit_skills:
+            return 1.0
+        return GEAR_SKILL_SCALE if skill in self.u.gear_skills else 0.0
+
+
+# スキルの強さ。DESIGN.md §5.4 の表と同じ値にしておく
+SKILL = {
+    "鉄壁": 0.90,  # 受けるダメージの倍率
+    "不動": 0.87,
+    "天光": (0.88, 0.05),  # 受けるダメージの倍率, 毎ラウンドの回復(最大体力に対して)
+    "一閃": 1.35,  # 1ラウンド目に与えるダメージの倍率
+    "業火": 1.15,  # 与えるダメージの倍率
+    "冥呪": (1.12, 0.92, 3),  # 与えるダメージの倍率, 攻撃のたびに相手の攻にかける倍率, 回数
+    "吸魂": 0.20,  # 与えたダメージに対する回復
+    "大海": 0.06,  # 毎ラウンドの回復(最大体力に対して)
+    "回生": 0.04,
+    "連撃": 0.15,  # 毎ラウンドの追撃の確率
+    "雷光": 0.30,  # 会心率に足す
+    "看破": 1.25,  # 相性が有利なときの倍率(通常は ADVANTAGE)
+    "呪縛": 0.85,  # 相手の攻の倍率
+    "加護": 0.6,  # 体力が0になったとき、1度だけ体力1で踏みとどまる確率
+}
+
+
+def scaled(multiplier, power):
+    """倍率を効き目(0〜1)に合わせて弱める。power 0 なら効果なし。"""
+    return 1 + (multiplier - 1) * power
 
 
 def hit(a, d, rng):
     """このラウンドに a が d に与えるダメージ。"""
     mult = affinity(a.u.attr, d.u.attr)
-    if mult > 1 and a.has("看破"):
-        mult = 1.25
-    if mult < 1 and a.has("逆境"):
-        mult = 1.0
-    strikes = 2 if a.has("連撃") and rng.random() < 0.15 else 1
+    if mult > 1:
+        mult += (SKILL["看破"] - ADVANTAGE) * a.power("看破")
+    if mult < 1:
+        mult += (1 - DISADVANTAGE) * a.power("逆境")
+    strikes = 2 if rng.random() < SKILL["連撃"] * a.power("連撃") else 1
     total = 0.0
     for _ in range(strikes):
         dmg = a.u.atk * a.atk_mod * mult * rng.uniform(1 - DMG_SPREAD, 1 + DMG_SPREAD)
-        if rng.random() < CRIT_RATE + (0.3 if a.has("雷光") else 0.0):
+        if rng.random() < CRIT_RATE + SKILL["雷光"] * a.power("雷光"):
             dmg *= CRIT_MULT
         total += dmg
-    if a.rounds == 0 and a.has("一閃"):
-        total *= 1.5
-    total *= 1.15 if a.has("業火") else 1.0
-    total *= 1.12 if a.has("冥呪") else 1.0
-    for skill, cut in (("不動", 0.87), ("鉄壁", 0.9), ("天光", 0.88)):
-        if d.has(skill):
-            total *= cut
+    if a.rounds == 0:
+        total *= scaled(SKILL["一閃"], a.power("一閃"))
+    total *= scaled(SKILL["業火"], a.power("業火"))
+    total *= scaled(SKILL["冥呪"][0], a.power("冥呪"))
+    for skill, cut in (("不動", SKILL["不動"]), ("鉄壁", SKILL["鉄壁"]), ("天光", SKILL["天光"][0])):
+        total *= scaled(cut, d.power(skill))
     return total
 
 
-def after_round(f, foe, dealt):
-    if f.hp <= 0 and f.has("加護") and not f.guts_used:
-        f.hp, f.guts_used = 1, True
+def after_round(f, foe, dealt, rng):
+    guard = f.power("加護")
+    if f.hp <= 0 and guard and not f.guts_used:
+        f.guts_used = True
+        if rng.random() < SKILL["加護"] * guard:
+            f.hp = 1
     if f.hp > 0:
-        if f.has("吸魂"):
-            f.hp += dealt * 0.2
-        for skill, heal in (("大海", 0.06), ("回生", 0.04), ("天光", 0.05)):
-            if f.has(skill):
-                f.hp += f.u.hp * heal
+        f.hp += dealt * SKILL["吸魂"] * f.power("吸魂")
+        for skill, heal in (("大海", SKILL["大海"]), ("回生", SKILL["回生"]), ("天光", SKILL["天光"][1])):
+            f.hp += f.u.hp * heal * f.power(skill)
         f.hp = min(f.hp, f.u.hp)
-    if f.has("冥呪") and f.curse < 3:
-        foe.atk_mod *= 0.92
+    curse = f.power("冥呪")
+    if curse and f.curse < SKILL["冥呪"][2]:
+        foe.atk_mod *= scaled(SKILL["冥呪"][1], curse)
         f.curse += 1
     f.rounds += 1
 
@@ -314,16 +344,14 @@ def after_round(f, foe, dealt):
 def duel(ua, ub, rng):
     """1対1。毎ラウンド両者が同時に攻撃する。ua が勝てば True。"""
     a, b = Fighter(ua), Fighter(ub)
-    if a.has("呪縛"):
-        b.atk_mod *= 0.85
-    if b.has("呪縛"):
-        a.atk_mod *= 0.85
+    b.atk_mod *= scaled(SKILL["呪縛"], a.power("呪縛"))
+    a.atk_mod *= scaled(SKILL["呪縛"], b.power("呪縛"))
     for _ in range(MAX_ROUNDS):
         da, db = hit(a, b, rng), hit(b, a, rng)
         b.hp -= da
         a.hp -= db
-        after_round(a, b, da)
-        after_round(b, a, db)
+        after_round(a, b, da, rng)
+        after_round(b, a, db, rng)
         if a.hp <= 0 or b.hp <= 0:
             break
     # 相打ちや時間切れは残り体力の割合で判定
@@ -379,6 +407,29 @@ def report_battle(cards):
         print("        " + "".join(f"{'土★' + str(j):>6}" for j in range(1, 5)))
         for i in range(1, 5):
             print(f"    水★{i}" + pct(winrate(std("水", i, rank), std("土", j, rank)) for j in range(1, 5)))
+
+    print("\n== 対戦: スキルを持つカード vs スキルのない同じ属性の★2 (ランク10, ★2の付与) ==")
+    print("  霊獣・霊具は、★2の精霊に付けたときの、★2の付与との比較")
+    two = {s.attr: s for s in c.values() if s.type == "精霊" and s.rarity == 2}
+    for card in c.values():
+        if not card.skill:
+            continue
+        beast, tool = gear[card.attr]
+        base = Unit(two[card.attr], beast, tool, rank=10)
+        if card.type == "精霊":
+            mine = Unit(card, beast, tool, rank=10)
+        elif card.type == "霊獣":
+            mine = Unit(two[card.attr], card, tool, rank=10)
+        else:
+            mine = Unit(two[card.attr], beast, card, rank=10)
+        note = "  (相性が有利・不利なときだけ効く)" if card.skill in ("逆境", "看破") else ""
+        label = f"{card.name}({card.type}{card.attr}★{card.rarity} {card.skill})"
+        print(f"  {label:<28}{winrate(mine, base, n=3000):>5.0%}{note}")
+    avg = {}
+    for a in "水火土雷光闇":
+        ws = [winrate(std(a, 2, 10), std(b, 2, 10), n=2000) for b in "水火土雷光闇" if b != a]
+        avg[a] = sum(ws) / len(ws)
+    print("  属性ごとの平均勝率(★2どうし): " + " ".join(f"{a} {v:.0%}" for a, v in avg.items()))
 
     print("\n== 対戦: ランク (同じカードのランク1と比べる) ==")
     for name, attr, rarity in (("雫(★1)", "水", 1), ("光輪天女(★5)", "光", 5)):

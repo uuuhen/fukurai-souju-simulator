@@ -352,7 +352,10 @@
     } else {
       rows.push(["状態", "まだ持っていません"]);
     }
-    if (card.skill) rows.push(["スキル", `${card.skill}: ${C.SKILLS[card.skill]}`]);
+    if (card.skill) {
+      const half = card.type === "精霊" ? "" : "（霊獣・霊具が持つときは効き目が半分）";
+      rows.push(["スキル", `${card.skill}: ${C.SKILLS[card.skill]}${half}`]);
+    }
     $("sheet-body").innerHTML = cardHTML(card, { big: true, static: true }) +
       `<div class="info"><h2 id="sheet-title">${owned ? esc(card.name) : "？？？"}${owned ? `<small>${esc(card.kana)}</small>` : ""}</h2>` +
       `<p class="sub">${card.type} · ${card.attr} · ${"★".repeat(card.rarity)}</p>` +
